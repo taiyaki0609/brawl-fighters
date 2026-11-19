@@ -43,6 +43,7 @@ function leaveRoom(socket, notify = true) {
   room.states.delete(socket.id);
   room.lastAttacks.delete(socket.id);
   room.lastAttackSeq.delete(socket.id);
+  if (room.selections) room.selections.delete(socket.id);
 
   if (notify) {
     socket.to(code).emit("room:opponent-left");
@@ -84,7 +85,7 @@ io.on("connection", (socket) => {
     }
 
     const code = makeRoomCode();
-    const room = { players: [opponentId, socket.id], mode: "matchmaking", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map() };
+    const room = { players: [opponentId, socket.id], mode: "matchmaking", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), finished: false, selections: new Map(), finished: false };
     rooms.set(code, room);
 
     const first = io.sockets.sockets.get(opponentId);
@@ -128,6 +129,26 @@ io.on("connection", (socket) => {
     room.players.push(socket.id);
     attachPlayerToRoom(socket, code, 2);
     io.to(code).emit("game:ready", { roomCode: code, players: 2 });
+  });
+
+  socket.on("game:select-character", (data) => {
+    const code = socket.data.roomCode;
+    const room = code && rooms.get(code);
+    if (!room || room.players.length !== 2 || room.finished) return;
+    const character = data && ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(data.character) ? data.character : null;
+    if (!character) return;
+    if (!room.selections) room.selections = new Map();
+    if (room.selections.has(socket.id)) return;
+    room.selections.set(socket.id, character);
+    const opponentId = room.players.find((id) => id !== socket.id);
+    const opponentCharacter = room.selections.get(opponentId) || null;
+    socket.emit("game:selection-status", { youReady: true, opponentReady: Boolean(opponentCharacter), opponentCharacter });
+    if (opponentCharacter) {
+      io.to(opponentId).emit("game:selection-status", { youReady: true, opponentReady: true, opponentCharacter: character });
+      io.to(code).emit("game:start-countdown");
+    } else {
+      io.to(opponentId).emit("game:selection-status", { youReady: false, opponentReady: true, opponentCharacter: character });
+    }
   });
 
   socket.on("game:state", (state) => {
@@ -219,9 +240,14 @@ io.on("connection", (socket) => {
   socket.on("game:health", (data) => {
     const code = socket.data.roomCode;
     const room = code && rooms.get(code);
-    if (!room || !data) return;
+    if (!room || !data || room.finished) return;
     const health = Math.max(0, Math.min(100, Number(data.health) || 0));
     socket.to(code).emit("game:health", { health, message: String(data.message || "ダメージ！").slice(0, 80) });
+    if (health <= 0 && !room.finished) {
+      room.finished = true;
+      const winnerId = room.players.find((id) => id !== socket.id);
+      io.to(code).emit("game:result", { winnerId, loserId: socket.id });
+    }
   });
 
   socket.on("room:leave", () => leaveRoom(socket));
