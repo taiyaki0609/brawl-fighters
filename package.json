@@ -1,0 +1,14 @@
+{
+  "name": "brawl-fighters",
+  "version": "1.0.0",
+  "private": true,
+  "description": "2D pixel-art fighting game with online matchmaking and rooms",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
