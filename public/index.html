@@ -43,16 +43,18 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <div class="hud"><div><div class="playerlabel"><span>YOU</span><span id="youName">SURGE</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span>OPPONENT</span><span id="opName">SURGE</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
 <canvas id="arena" width="960" height="540" aria-label="対戦ステージ"></canvas>
 <div class="controls"><label>キャラクター <select id="character"><option value="SURGE">サージ</option><option value="SHELLY">シェリー</option><option value="SPIKE">スパイク</option><option value="CROW">クロウ</option></select></label></div>
-<div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">2段ジャンプ</button><button id="attack">攻撃！</button></div>
-<p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space で2段ジャンプ、F / Enter で攻撃。スマホ・タブレットはボタンを使用できます。</p>
+<div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">2段ジャンプ</button></div>
+<div class="controls attack-controls"><button id="quickAttack">通常攻撃 [F]</button><button id="strongAttack" class="secondary">強攻撃 [G]</button><button id="specialAttack" style="background:#ff8b4a">必殺技 [H]</button></div>
+<p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space で2段ジャンプ、F＝通常攻撃・G＝強攻撃・H＝必殺技。スマホ・タブレットは攻撃ボタンを使用できます。</p>
 <div id="gameStatus" class="note">対戦相手と接続中...</div>
 </section></main>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket=io();const $=id=>document.getElementById(id);
 let roomCode=null,playerNumber=1,gameActive=false,lastSend=0;
-const me={x:.22,y:0,vy:0,jumpCount:0,facing:1,action:"idle",character:"SURGE",attackUntil:0};
-const opponent={x:.78,y:0,facing:-1,action:"idle",character:"SURGE"};
+const me={x:.22,y:0,vy:0,jumpCount:0,facing:1,action:"idle",character:"SURGE",attackUntil:0,attackType:"quick",attackSeq:0};
+const opponent={x:.78,y:0,facing:-1,action:"idle",character:"SURGE",attackType:"quick",attackSeq:0};
+const attackEffects=[];
 const colors={SURGE:"#42d9f5",SHELLY:"#bd79ff",SPIKE:"#72e36d",CROW:"#c4e7ff"};
 function status(t){$("status").textContent=t}
 function showRoom(c){roomCode=c;$("roomCode").textContent=c;$("roomInfo").style.display="block"}
@@ -70,7 +72,7 @@ socket.on("room:waiting",()=>{if(gameActive){$("gameStatus").textContent="相手
 socket.on("room:opponent-left",()=>{$("gameStatus").textContent="対戦相手が退出しました。"});
 socket.on("room:error",d=>status(d.message));
 socket.on("game:ready",()=>{enterGame();});
-socket.on("game:opponent-state",s=>{opponent.x=s.x;opponent.y=s.y;opponent.facing=s.facing;opponent.action=s.action;opponent.character=s.character;$("opName").textContent=s.character;});
+socket.on("game:opponent-state",s=>{opponent.x=s.x;opponent.y=s.y;opponent.facing=s.facing;opponent.action=s.action;opponent.character=s.character;opponent.attackType=s.attackType||"quick";if(s.attackSeq!==opponent.attackSeq){opponent.attackSeq=s.attackSeq;spawnAttackEffect(opponent.x*960,435-opponent.y*360,opponent.facing,opponent.attackType,opponent.character)}$("opName").textContent=s.character;});
 $("matchButton").onclick=()=>socket.emit("matchmaking:join");
 $("cancelButton").onclick=()=>socket.emit("matchmaking:cancel");
 $("createButton").onclick=()=>socket.emit("room:create");
@@ -80,14 +82,14 @@ $("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[
 $("backButton").onclick=leaveGame;
 $("character").onchange=()=>{me.character=$("character").value;$("youName").textContent=me.character};
 const heldDirections=new Set();
-function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
+function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(["quick","strong","special"].includes(a)){me.action="attack";me.attackType=a;me.attackSeq++;me.attackUntil=performance.now()+(a==="quick"?230:a==="strong"?470:620);spawnAttackEffect(me.x*960,435-me.y*360,me.facing,a,me.character)}draw()}
 function holdDirection(direction,on){if(on){heldDirections.add(direction);me.facing=direction==="left"?-1:1}else heldDirections.delete(direction)}
 $("left").onpointerdown=e=>{e.preventDefault();$("left").setPointerCapture?.(e.pointerId);holdDirection("left",true)};
 $("right").onpointerdown=e=>{e.preventDefault();$("right").setPointerCapture?.(e.pointerId);holdDirection("right",true)};
 for(const id of ["left","right"]){$(id).onpointerup=$(id).onpointercancel=$(id).onlostpointercapture=()=>holdDirection(id,false)}
 window.addEventListener("pointerup",()=>{heldDirections.clear()});
-$("jump").onpointerdown=e=>{e.preventDefault();act("jump")};$("attack").onpointerdown=e=>{e.preventDefault();act("attack")};
-window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")holdDirection("left",true);if(k==="d"||k==="arrowright")holdDirection("right",true);if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("attack")});
+$("jump").onpointerdown=e=>{e.preventDefault();act("jump")};$("quickAttack").onpointerdown=e=>{e.preventDefault();act("quick")};$("strongAttack").onpointerdown=e=>{e.preventDefault();act("strong")};$("specialAttack").onpointerdown=e=>{e.preventDefault();act("special")};
+window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")holdDirection("left",true);if(k==="d"||k==="arrowright")holdDirection("right",true);if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("quick");if(k==="g")act("strong");if(k==="h")act("special")});
 window.addEventListener("keyup",e=>{let k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")holdDirection("left",false);if(k==="d"||k==="arrowright")holdDirection("right",false)});
 window.addEventListener("blur",()=>heldDirections.clear());
 function pixel(ctx,x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
@@ -191,7 +193,14 @@ function fighter(ctx,x,y,face,color,action,label,character){
  ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";
  ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-143);ctx.shadowBlur=0;
 }
-function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);ctx.fillStyle="#ffffff18";for(let i=0;i<18;i++){ctx.fillRect((i*137)%960,100+(i*53)%245,3,3)}let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action,"YOU",me.character);fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT",opponent.character);}
-function loop(t){if(gameActive){const movingLeft=heldDirections.has("left"),movingRight=heldDirections.has("right");if(movingLeft!==movingRight){const dir=movingLeft?-1:1;me.x=Math.max(.06,Math.min(.94,me.x+dir*.008));me.facing=dir;if(me.y===0&&me.action!=="attack")me.action="walk"}else if(me.y===0&&me.action==="walk")me.action="idle";if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
+function spawnAttackEffect(x,y,facing,type,character){
+ const palette={SURGE:"#53eaff",SHELLY:"#e99cff",SPIKE:"#9cff70",CROW:"#d8efff"};
+ const main=type==="special"?"#ffe36e":type==="strong"?"#ffad55":(palette[character]||"#ffffff");
+ const count=type==="quick"?9:type==="strong"?18:30;
+ for(let i=0;i<count;i++){const spread=type==="quick"?.9:1.35;const angle=type==="special"?Math.PI*2*i/count:(-spread/2+spread*i/Math.max(1,count-1));const speed=type==="special"?2.5+Math.random()*3:type==="strong"?3+Math.random()*2:2+Math.random()*2;attackEffects.push({x:x+facing*42,y:y-78,vx:Math.cos(angle)*speed*facing,vy:Math.sin(angle)*speed-.5,life:type==="special"?42:type==="strong"?30:20,max:type==="special"?42:type==="strong"?30:20,size:type==="special"?5:type==="strong"?4:3,color:i%3===0?"#ffffff":main,type})}
+}
+function drawAttackEffects(ctx){for(let i=attackEffects.length-1;i>=0;i--){const e=attackEffects[i];e.x+=e.vx;e.y+=e.vy;e.vy+=.025;e.life--;if(e.life<=0){attackEffects.splice(i,1);continue}const alpha=e.life/e.max;ctx.save();ctx.globalAlpha=alpha;if(e.type==="special"){ctx.strokeStyle=e.color;ctx.lineWidth=4*alpha;ctx.beginPath();ctx.arc(e.x,e.y,18+(1-alpha)*58,0,Math.PI*2);ctx.stroke();ctx.fillStyle=e.color;ctx.fillRect(e.x-e.size/2,e.y-e.size/2,e.size,e.size)}else{ctx.translate(e.x,e.y);ctx.rotate(Math.atan2(e.vy,e.vx));ctx.fillStyle=e.color;ctx.fillRect(-e.size*2,-e.size/2,e.size*4,e.size);if(e.type==="strong"){ctx.fillStyle="#fff4c2";ctx.fillRect(-e.size,-e.size*2,e.size*2,e.size*4)}}ctx.restore()}}
+function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);ctx.fillStyle="#ffffff18";for(let i=0;i<18;i++){ctx.fillRect((i*137)%960,100+(i*53)%245,3,3)}let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action,"YOU",me.character);fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT",opponent.character);drawAttackEffects(ctx);}
+function loop(t){if(gameActive){const movingLeft=heldDirections.has("left"),movingRight=heldDirections.has("right");if(movingLeft!==movingRight){const dir=movingLeft?-1:1;me.x=Math.max(.06,Math.min(.94,me.x+dir*.008));me.facing=dir;if(me.y===0&&me.action!=="attack")me.action="walk"}else if(me.y===0&&me.action==="walk")me.action="idle";if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character,attackType:me.attackType,attackSeq:me.attackSeq});lastSend=t}draw()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 </script></body></html>
