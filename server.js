@@ -138,7 +138,8 @@ io.on("connection", (socket) => {
     const character = data && ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(data.character) ? data.character : null;
     if (!character) return;
     if (!room.selections) room.selections = new Map();
-    if (!room.health) room.health = new Map(room.players.map(id => [id,100]));
+    if (!room.health) room.health = new Map();
+    for (const playerId of room.players) if (!room.health.has(playerId)) room.health.set(playerId,100);
     if (room.selections.has(socket.id)) return;
     room.selections.set(socket.id, character);
     const opponentId = room.players.find((id) => id !== socket.id);
