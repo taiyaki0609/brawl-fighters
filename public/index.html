@@ -36,6 +36,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 .character-card strong{font-size:1.05rem}.character-card small{color:#d1d1eb;font-size:.75rem}
 #selectedDescription{min-height:26px;color:#fff1ad;margin:8px}
 #startBattleButton{width:min(100%,360px);font-size:1.15rem;padding:14px}
+#resultBanner{display:none;margin:14px 0;padding:20px;text-align:center;border:3px solid #ffe36e;border-radius:16px;background:linear-gradient(135deg,#423b76,#171a35);font-size:clamp(2rem,8vw,4rem);font-weight:1000;color:#ffe36e;text-shadow:3px 3px #9b4e32;box-shadow:0 0 28px #ffe36e55}
 @media(max-width:560px){.character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.character-card{min-height:155px}}
 @media(max-width:560px){body{padding:8px}.panel{padding:14px}.controls button{flex:1}.topbar{justify-content:center}}
 </style></head>
@@ -70,6 +71,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <div class="controls attack-controls"><button id="quickAttack">通常攻撃 [F]</button><button id="strongAttack" class="secondary">強攻撃 [G]</button><button id="specialAttack" style="background:#ff8b4a">必殺技 [H]</button></div>
 <p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space で2段ジャンプ、F＝通常攻撃・G＝強攻撃・H＝必殺技。スマホ・タブレットは攻撃ボタンを使用できます。</p>
 <div id="gameStatus" class="note">対戦相手と接続中...</div>
+<div id="resultBanner" role="status" aria-live="assertive"></div>
 </section></main>
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -126,6 +128,7 @@ $("startBattleButton").onclick=()=>{
 };
 function beginBattle(){
  if(gameActive)return;
+ $("resultBanner").style.display="none";$("resultBanner").textContent="";
  me.health=100;opponent.health=100;me.knockback=0;me.poisonUntil=0;me.vy=0;me.jumpCount=0;updateHealth();
  gameActive=true;$("selectScreen").style.display="none";$("arenaTitle").style.display="block";
  document.querySelector(".hud").style.display="grid";$("arena").style.display="block";
@@ -145,7 +148,11 @@ socket.on("game:start-countdown",()=>{
  tick();countdownTimer=setInterval(tick,100);
 });
 socket.on("game:result",result=>{
- gameActive=false;$("gameStatus").textContent=result.winnerId===socket.id?"🏆 WIN！ 勝利！":"LOSE… またチャレンジしよう！";
+ gameActive=false;quickHeld=false;heldDirections.clear();
+ const won=Boolean(result&&result.won);
+ $("resultBanner").textContent=won?"🏆 WIN！ 勝利！":"LOSE… またチャレンジしよう！";
+ $("resultBanner").style.display="block";
+ $("gameStatus").textContent=won?"相手のHPが0になりました！":"あなたのHPが0になりました。";
 });
 const heldDirections=new Set();
 function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(["quick","strong","special"].includes(a)){const now=performance.now();if(a==="strong"&&now<(me.strongReady||0))return;if(a==="special"&&now<(me.specialReady||0))return;if(a==="strong")me.strongReady=now+({SURGE:820,SHELLY:720,SPIKE:900,CROW:650}[me.character]);if(a==="special")me.specialReady=now+({SURGE:1500,SHELLY:1350,SPIKE:1650,CROW:1250}[me.character]);me.action="attack";me.attackType=a;me.attackSeq++;me.attackUntil=now+(a==="quick"?({SURGE:230,SHELLY:180,SPIKE:300,CROW:170}[me.character]):a==="strong"?({SURGE:520,SHELLY:380,SPIKE:470,CROW:340}[me.character]):({SURGE:650,SHELLY:520,SPIKE:600,CROW:500}[me.character]));spawnAttackEffect(me.x*960,435-me.y*360,me.facing,a,me.character);socket.emit("game:attack",{x:me.x,y:me.y,facing:me.facing,character:me.character,type:a,seq:me.attackSeq});if(a==="quick")nextQuickAt=now+({SURGE:280,SHELLY:240,SPIKE:360,CROW:210}[me.character])}draw()}
@@ -159,7 +166,7 @@ window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(["arrowleft",
 window.addEventListener("keyup",e=>{let k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")holdDirection("left",false);if(k==="d"||k==="arrowright")holdDirection("right",false);if(k==="f"||k==="enter")quickHeld=false});
 window.addEventListener("blur",()=>heldDirections.clear());
 function pixel(ctx,x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
-function fighter(ctx,x,y,face,color,action,label,character){
+function fighterPixel(ctx,x,y,face,color,action,label,character){
  const now=performance.now()/1000;
  const moving=action==="walk",jumping=action==="jump"||y<430,attacking=action==="attack";
  const run=Math.sin(now*13),idle=Math.sin(now*3)*1.5;
@@ -258,6 +265,23 @@ function fighter(ctx,x,y,face,color,action,label,character){
  ctx.restore();
  ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";
  ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-143);ctx.shadowBlur=0;
+}
+const fighterModels={};
+const fighterModelUrls={SURGE:"https://cdn.brawlify.com/brawlers/model/16000038.png",SHELLY:"https://cdn.brawlify.com/brawlers/model/16000000.png",SPIKE:"https://cdn.brawlify.com/brawlers/model/16000005.png",CROW:"https://cdn.brawlify.com/brawlers/model/16000012.png"};
+for(const [name,url] of Object.entries(fighterModelUrls)){const img=new Image();img.src=url;fighterModels[name]=img;}
+function fighter(ctx,x,y,face,color,action,label,character){
+ const img=fighterModels[character];
+ if(!img||!img.complete||!img.naturalWidth){fighterPixel(ctx,x,y,face,color,action,label,character);return;}
+ const now=performance.now()/1000;
+ const bob=action==="jump"||y<430?-5:action==="walk"?Math.abs(Math.sin(now*13))*2:Math.sin(now*3)*1.5;
+ const scale=action==="attack"?1.06:1;
+ ctx.save();
+ ctx.globalAlpha=.28;ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(x,y+3,action==="jump"||y<430?20:34,6,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+ ctx.translate(Math.round(x),Math.round(y+bob));ctx.scale(face*scale,scale);
+ ctx.shadowColor=color;ctx.shadowBlur=action==="attack"?18:7;
+ ctx.drawImage(img,-82,-194,164,194);
+ ctx.restore();
+ ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-205+bob);ctx.shadowBlur=0;
 }
 function spawnAttackEffect(x,y,facing,type,character){
  const palette={SURGE:"#45eaff",SHELLY:"#ffb5e8",SPIKE:"#a8f56b",CROW:"#d8efff"};
