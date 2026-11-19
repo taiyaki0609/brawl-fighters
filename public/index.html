@@ -64,7 +64,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <button id="startBattleButton">このキャラクターで対戦開始！</button>
 </section>
 <h2 id="arenaTitle" style="text-align:center;display:none">BRAWL ARENA</h2>
-<div class="hud"><div><div class="playerlabel"><span>YOU</span><span id="youName">SURGE</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span>OPPONENT</span><span id="opName">SURGE</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
+<div class="hud"><div><div class="playerlabel"><span id="youName">SURGE</span><span id="youHealthText">100 HP</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span id="opName">SURGE</span><span id="opHealthText">100 HP</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
 <canvas id="arena" width="960" height="540" aria-label="対戦ステージ"></canvas>
 <div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">2段ジャンプ</button></div>
 <div class="controls attack-controls"><button id="quickAttack">通常攻撃 [F]</button><button id="strongAttack" class="secondary">強攻撃 [G]</button><button id="specialAttack" style="background:#ff8b4a">必殺技 [H]</button></div>
@@ -81,7 +81,7 @@ const attackEffects=[];const damagePopups=[];
 let quickHeld=false,nextQuickAt=0;
 const colors={SURGE:"#42d9f5",SHELLY:"#bd79ff",SPIKE:"#72e36d",CROW:"#c4e7ff"};
 function status(t){$("status").textContent=t}
-function updateHealth(){$("youHp").style.width=me.health+"%";$("opHp").style.width=opponent.health+"%";$("youHp").style.background=me.health<30?"#ff596b":"#62e58b";$("opHp").style.background=opponent.health<30?"#ff596b":"#62e58b";}
+function updateHealth(){$("youHp").style.width=me.health+"%";$("opHp").style.width=opponent.health+"%";$("youHealthText").textContent=me.health+" HP";$("opHealthText").textContent=opponent.health+" HP";$("youHp").style.background=me.health<30?"#ff596b":"#62e58b";$("opHp").style.background=opponent.health<30?"#ff596b":"#62e58b";}
 function showRoom(c){roomCode=c;$("roomCode").textContent=c;$("roomInfo").style.display="block"}
 function resetLobby(){ $("roomInfo").style.display="none";$("cancelButton").disabled=true;$("matchButton").disabled=false}
 function enterGame(){gameActive=false;$("lobby").style.display="none";$("game").style.display="block";$("selectScreen").style.display="block";$("arenaTitle").style.display="none";document.querySelector(".hud").style.display="none";$("arena").style.display="none";document.querySelectorAll(".controls").forEach(e=>e.style.display="none");$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="キャラクターを選択してください。";draw()}
