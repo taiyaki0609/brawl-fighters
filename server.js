@@ -106,7 +106,7 @@ io.on("connection", (socket) => {
     removeFromQueue(socket.id);
 
     const code = makeRoomCode();
-    rooms.set(code, { players: [socket.id], mode: "private", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map() });
+    rooms.set(code, { players: [socket.id], mode: "private", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), finished: false });
     attachPlayerToRoom(socket, code, 1);
     socket.emit("room:created", { roomCode: code });
   });
@@ -253,7 +253,8 @@ io.on("connection", (socket) => {
     if (health <= 0 && !room.finished) {
       room.finished = true;
       const winnerId = room.players.find((id) => id !== socket.id);
-      io.to(code).emit("game:result", { winnerId, loserId: socket.id });
+      io.to(winnerId).emit("game:result", { won: true });
+      io.to(socket.id).emit("game:result", { won: false });
     }
   });
 
