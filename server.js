@@ -40,6 +40,9 @@ function leaveRoom(socket, notify = true) {
 
   if (!room) return;
   room.players = room.players.filter((id) => id !== socket.id);
+  room.states.delete(socket.id);
+  room.lastAttacks.delete(socket.id);
+  room.lastAttackSeq.delete(socket.id);
 
   if (notify) {
     socket.to(code).emit("room:opponent-left");
@@ -54,6 +57,7 @@ function leaveRoom(socket, notify = true) {
 
 function attachPlayerToRoom(socket, code, playerNumber) {
   socket.data.roomCode = code;
+  socket.data.playerNumber = playerNumber;
   socket.join(code);
   socket.emit("room:joined", { roomCode: code, playerNumber });
 }
@@ -80,7 +84,7 @@ io.on("connection", (socket) => {
     }
 
     const code = makeRoomCode();
-    const room = { players: [opponentId, socket.id], mode: "matchmaking" };
+    const room = { players: [opponentId, socket.id], mode: "matchmaking", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map() };
     rooms.set(code, room);
 
     const first = io.sockets.sockets.get(opponentId);
@@ -101,7 +105,7 @@ io.on("connection", (socket) => {
     removeFromQueue(socket.id);
 
     const code = makeRoomCode();
-    rooms.set(code, { players: [socket.id], mode: "private" });
+    rooms.set(code, { players: [socket.id], mode: "private", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map() });
     attachPlayerToRoom(socket, code, 1);
     socket.emit("room:created", { roomCode: code });
   });
@@ -138,7 +142,86 @@ io.on("connection", (socket) => {
       attackType: ["quick", "strong", "special"].includes(state.attackType) ? state.attackType : "quick",
       attackSeq: Math.max(0, Math.floor(Number(state.attackSeq) || 0))
     };
+    const room = rooms.get(code);
+    const playerNumber = room.players.indexOf(socket.id) + 1;
+    safeState.globalX = playerNumber === 2 ? 1 - safeState.x : safeState.x;
+    safeState.globalFacing = playerNumber === 2 ? -safeState.facing : safeState.facing;
+    room.states.set(socket.id, safeState);
     socket.to(code).emit("game:opponent-state", safeState);
+  });
+
+  socket.on("game:attack", (attack) => {
+    const code = socket.data.roomCode;
+    const room = code && rooms.get(code);
+    if (!room || room.players.length !== 2 || !attack || typeof attack !== "object") return;
+    const victimId = room.players.find((id) => id !== socket.id);
+    const victimState = room.states.get(victimId);
+    if (!victimState) return;
+
+    const allowedCharacters = ["SURGE", "SHELLY", "SPIKE", "CROW"];
+    const character = allowedCharacters.includes(attack.character) ? attack.character : "SURGE";
+    const type = ["quick", "strong", "special"].includes(attack.type) ? attack.type : "quick";
+    const seq = Math.max(0, Math.floor(Number(attack.seq) || 0));
+    if (room.lastAttackSeq.get(socket.id) === seq) return;
+    const now = Date.now();
+    const cooldown = type === "quick" ? 130 : type === "strong" ? 420 : 700;
+    if (now - (room.lastAttacks.get(socket.id) || 0) < cooldown) return;
+    room.lastAttacks.set(socket.id, now);
+    room.lastAttackSeq.set(socket.id, seq);
+
+    const attackerNumber = room.players.indexOf(socket.id) + 1;
+    const ax = Math.max(0, Math.min(1, Number(attack.x) || 0));
+    const ay = Math.max(0, Math.min(1, Number(attack.y) || 0));
+    const facing = attack.facing === -1 ? -1 : 1;
+    const attackerX = attackerNumber === 2 ? 1 - ax : ax;
+    const attackerFacing = attackerNumber === 2 ? -facing : facing;
+    const victimX = victimState.globalX;
+    const victimY = victimState.y;
+    const dx = (victimX - attackerX) * 960;
+    const dy = Math.abs(victimY - ay) * 360;
+    const distance = Math.abs(dx);
+    const radial = type === "special" && ["SURGE", "SPIKE", "CROW"].includes(character);
+    const ranges = {
+      SURGE: { quick: 285, strong: 355, special: 205 },
+      SHELLY: { quick: 205, strong: 245, special: 285 },
+      SPIKE: { quick: 265, strong: 290, special: 190 },
+      CROW: { quick: 255, strong: 305, special: 215 }
+    };
+    const range = ranges[character][type];
+    const inDirection = radial || Math.sign(dx) === attackerFacing;
+    if (!inDirection || distance > range || dy > 145) return;
+
+    let damage = ({ SURGE: { quick: 13, strong: 24, special: 30 },
+      SHELLY: { quick: 21, strong: 30, special: 38 },
+      SPIKE: { quick: 14, strong: 22, special: 28 },
+      CROW: { quick: 10, strong: 14, special: 18 } })[character][type];
+    if (character === "SHELLY") {
+      const closeBonus = Math.max(0, 1 - distance / range);
+      damage = Math.round(damage * (0.42 + closeBonus * 0.95));
+    }
+    if (character === "SPIKE" && type === "quick" && distance > 180) damage += 3;
+    const knockback = ({ SURGE: { quick: .018, strong: .045, special: .055 },
+      SHELLY: { quick: .022, strong: .052, special: .065 },
+      SPIKE: { quick: .024, strong: .04, special: .05 },
+      CROW: { quick: .014, strong: .03, special: .042 } })[character][type];
+    const poison = character === "CROW" ? { duration: type === "special" ? 3600 : 3000, interval: 850 } : null;
+    io.to(victimId).emit("game:hit", {
+      damage, knockbackDir: dx >= 0 ? 1 : -1, knockback,
+      lift: type === "strong" || type === "special" ? .22 : .13,
+      poison
+    });
+    socket.emit("game:hit-confirm", {
+      message: character === "CROW" ? "命中！毒を付与！" :
+        character === "SHELLY" ? "命中！近距離ほど大ダメージ！" : "命中！ ダメージ " + damage
+    });
+  });
+
+  socket.on("game:health", (data) => {
+    const code = socket.data.roomCode;
+    const room = code && rooms.get(code);
+    if (!room || !data) return;
+    const health = Math.max(0, Math.min(100, Number(data.health) || 0));
+    socket.to(code).emit("game:health", { health, message: String(data.message || "ダメージ！").slice(0, 80) });
   });
 
   socket.on("room:leave", () => leaveRoom(socket));
