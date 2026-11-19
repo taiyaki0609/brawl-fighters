@@ -53,7 +53,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <div class="topbar"><strong style="color:#ffe36e">BRAWL FIGHTERS</strong><span id="playerInfo">PLAYER 1</span><button id="backButton" class="secondary">ロビーへ戻る</button></div>
 <section id="selectScreen">
 <h2>キャラクターを選ぼう！</h2>
-<p class="select-sub">好きなファイターを選択して、対戦を始めよう。</p>
+<p class="select-sub">好きなファイターを選んで「選択を確定」。2人そろったら試合開始！</p>
 <div class="character-grid">
 <button class="character-card selected" data-character="SURGE" aria-pressed="true"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000038.png" alt="サージ" loading="eager"><strong>サージ</strong><small>パワーアップ型</small></button>
 <button class="character-card" data-character="SHELLY" aria-pressed="false"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000000.png" alt="シェリー" loading="eager"><strong>シェリー</strong><small>ショットガン型</small></button>
@@ -61,7 +61,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <button class="character-card" data-character="CROW" aria-pressed="false"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000012.png" alt="クロウ" loading="eager"><strong>クロウ</strong><small>素早い羽攻撃型</small></button>
 </div>
 <div id="selectedDescription">サージ：エネルギー弾で攻めるパワフルなファイター！</div>
-<button id="startBattleButton">このキャラクターで対戦開始！</button>
+<button id="startBattleButton">このキャラクターで決定！</button>
 </section>
 <h2 id="arenaTitle" style="text-align:center;display:none">BRAWL ARENA</h2>
 <div class="hud"><div><div class="playerlabel"><span id="youName">SURGE</span><span id="youHealthText">100 HP</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span id="opName">SURGE</span><span id="opHealthText">100 HP</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
@@ -74,7 +74,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket=io();const $=id=>document.getElementById(id);
-let roomCode=null,playerNumber=1,gameActive=false,lastSend=0;
+let roomCode=null,playerNumber=1,gameActive=false,lastSend=0,characterLocked=false,countdownTimer=null;
 const me={x:.22,y:0,vy:0,jumpCount:0,facing:1,action:"idle",character:"SURGE",attackUntil:0,attackType:"quick",attackSeq:0,health:100,knockback:0,knockbackDir:0,poisonUntil:0,nextPoisonAt:0};
 const opponent={x:.78,y:0,facing:-1,action:"idle",character:"SURGE",attackType:"quick",attackSeq:0};
 const attackEffects=[];const damagePopups=[];
@@ -84,7 +84,7 @@ function status(t){$("status").textContent=t}
 function updateHealth(){$("youHp").style.width=me.health+"%";$("opHp").style.width=opponent.health+"%";$("youHealthText").textContent=me.health+" HP";$("opHealthText").textContent=opponent.health+" HP";$("youHp").style.background=me.health<30?"#ff596b":"#62e58b";$("opHp").style.background=opponent.health<30?"#ff596b":"#62e58b";}
 function showRoom(c){roomCode=c;$("roomCode").textContent=c;$("roomInfo").style.display="block"}
 function resetLobby(){ $("roomInfo").style.display="none";$("cancelButton").disabled=true;$("matchButton").disabled=false}
-function enterGame(){gameActive=false;$("lobby").style.display="none";$("game").style.display="block";$("selectScreen").style.display="block";$("arenaTitle").style.display="none";document.querySelector(".hud").style.display="none";$("arena").style.display="none";document.querySelectorAll(".controls").forEach(e=>e.style.display="none");$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="キャラクターを選択してください。";draw()}
+function enterGame(){gameActive=false;characterLocked=false;if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null}document.querySelectorAll(".character-card").forEach(card=>card.disabled=false);$("startBattleButton").disabled=false;$("startBattleButton").textContent="このキャラクターで決定！";$("lobby").style.display="none";$("game").style.display="block";$("selectScreen").style.display="block";$("arenaTitle").style.display="none";document.querySelector(".hud").style.display="none";$("arena").style.display="none";document.querySelectorAll(".controls").forEach(e=>e.style.display="none");$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="キャラクターを選択してください。";draw()}
 function leaveGame(){gameActive=false;socket.emit("room:leave");$("game").style.display="none";$("lobby").style.display="block";resetLobby();status("ロビーに戻りました。")}
 socket.on("connect",()=>status("サーバーに接続しました！対戦方法を選んでください。"));
 socket.on("connect_error",()=>status("サーバーに接続できません。再読み込みしてください。"));
@@ -98,8 +98,8 @@ socket.on("room:opponent-left",()=>{$("gameStatus").textContent="対戦相手が
 socket.on("room:error",d=>status(d.message));
 socket.on("game:ready",()=>{enterGame();});
 socket.on("game:opponent-state",s=>{opponent.x=s.x;opponent.y=s.y;opponent.facing=s.facing;opponent.action=s.action;opponent.character=s.character;opponent.attackType=s.attackType||"quick";if(s.attackSeq!==opponent.attackSeq){opponent.attackSeq=s.attackSeq;spawnAttackEffect(opponent.x*960,435-opponent.y*360,opponent.facing,opponent.attackType,opponent.character)}$("opName").textContent=s.character;});
-socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();socket.emit("game:health",{health:me.health,message:"相手に命中！"});if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！ 対戦終了です。";}});
-socket.on("game:health",data=>{opponent.health=data.health;updateHealth();$("gameStatus").textContent=data.message||"相手にダメージ！";if(opponent.health<=0){gameActive=false;$("gameStatus").textContent="WIN！ 相手をKOしました！";}});
+socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();socket.emit("game:health",{health:me.health,message:"相手に命中！"});if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！";}});
+socket.on("game:health",data=>{opponent.health=data.health;updateHealth();$("gameStatus").textContent=data.message||"相手にダメージ！";if(opponent.health<=0){$("gameStatus").textContent="相手をKO！ 勝敗を確認中…";}});
 socket.on("game:hit-confirm",data=>{$("gameStatus").textContent=data.message||"命中！";});
 $("matchButton").onclick=()=>socket.emit("matchmaking:join");
 $("cancelButton").onclick=()=>socket.emit("matchmaking:cancel");
@@ -110,17 +110,41 @@ $("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[
 $("backButton").onclick=leaveGame;
 const characterDescriptions={SURGE:"サージ：通常は直進エネルギー弾、強攻撃はチャージビーム、必殺技は着地ショックウェーブ！",SHELLY:"シェリー：通常は小さな扇状攻撃、強攻撃は広範囲バースト、必殺技は超ワイドブラスター！",SPIKE:"スパイク：通常は途中で分裂するトゲ、強攻撃はトゲの花火、必殺技は周囲にトゲをまき散らす！",CROW:"クロウ：通常は3方向の羽、強攻撃は毒の羽ラッシュ、必殺技は全方向フェザーストーム！"};
 document.querySelectorAll(".character-card").forEach(card=>card.addEventListener("click",()=>{
+ if(characterLocked)return;
  me.character=card.dataset.character;
  document.querySelectorAll(".character-card").forEach(other=>{const chosen=other===card;other.classList.toggle("selected",chosen);other.setAttribute("aria-pressed",String(chosen))});
  $("selectedDescription").textContent=characterDescriptions[me.character];
 }));
 $("startBattleButton").onclick=()=>{
- me.health=100;opponent.health=100;me.knockback=0;me.poisonUntil=0;updateHealth();
+ if(characterLocked)return;
+ characterLocked=true;document.querySelectorAll(".character-card").forEach(card=>card.disabled=true);
+ $("startBattleButton").disabled=true;$("startBattleButton").textContent="決定しました！";
+ $("selectedDescription").textContent="相手がキャラクターを選んでいます…";
+ $("gameStatus").textContent="キャラクターを確定しました。相手を待っています…";
+ socket.emit("game:select-character",{character:me.character});
+};
+function beginBattle(){
+ if(gameActive)return;
+ me.health=100;opponent.health=100;me.knockback=0;me.poisonUntil=0;me.vy=0;me.jumpCount=0;updateHealth();
  gameActive=true;$("selectScreen").style.display="none";$("arenaTitle").style.display="block";
  document.querySelector(".hud").style.display="grid";$("arena").style.display="block";
  document.querySelectorAll("#game .controls").forEach(e=>e.style.display="flex");
- $("youName").textContent=me.character;$("gameStatus").textContent="対戦開始！ "+me.character+" で戦おう！";draw();
-};
+ $("youName").textContent=me.character;$("gameStatus").textContent="BRAWL！ 対戦スタート！";draw();
+}
+socket.on("game:selection-status",data=>{
+ if(data.opponentCharacter){opponent.character=data.opponentCharacter;$("selectedDescription").textContent="相手は "+data.opponentCharacter+" を選択しました！";}
+ if(data.youReady&&!data.opponentReady){$("selectedDescription").textContent="決定しました！ 相手がキャラクターを選んでいます…";$("gameStatus").textContent="相手がキャラクターを選んでいます…";}
+ else if(data.youReady&&data.opponentReady){$("selectedDescription").textContent="2人のキャラクターが決定！まもなく試合開始！";$("gameStatus").textContent="両者の準備完了！";}
+});
+socket.on("game:start-countdown",()=>{
+ if(countdownTimer)clearInterval(countdownTimer);
+ const end=Date.now()+3000;
+ const tick=()=>{const left=Math.ceil((end-Date.now())/1000);if(left>0){$("selectedDescription").textContent=left===3?"よーい……":String(left)+"！";$("gameStatus").textContent=left===3?"よーい……":String(left)+"！";}else{clearInterval(countdownTimer);countdownTimer=null;$("selectedDescription").textContent="スタート！";beginBattle();}};
+ tick();countdownTimer=setInterval(tick,100);
+});
+socket.on("game:result",result=>{
+ gameActive=false;$("gameStatus").textContent=result.winnerId===socket.id?"🏆 WIN！ 勝利！":"LOSE… またチャレンジしよう！";
+});
 const heldDirections=new Set();
 function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(["quick","strong","special"].includes(a)){const now=performance.now();if(a==="strong"&&now<(me.strongReady||0))return;if(a==="special"&&now<(me.specialReady||0))return;if(a==="strong")me.strongReady=now+({SURGE:820,SHELLY:720,SPIKE:900,CROW:650}[me.character]);if(a==="special")me.specialReady=now+({SURGE:1500,SHELLY:1350,SPIKE:1650,CROW:1250}[me.character]);me.action="attack";me.attackType=a;me.attackSeq++;me.attackUntil=now+(a==="quick"?({SURGE:230,SHELLY:180,SPIKE:300,CROW:170}[me.character]):a==="strong"?({SURGE:520,SHELLY:380,SPIKE:470,CROW:340}[me.character]):({SURGE:650,SHELLY:520,SPIKE:600,CROW:500}[me.character]));spawnAttackEffect(me.x*960,435-me.y*360,me.facing,a,me.character);socket.emit("game:attack",{x:me.x,y:me.y,facing:me.facing,character:me.character,type:a,seq:me.attackSeq});if(a==="quick")nextQuickAt=now+({SURGE:280,SHELLY:240,SPIKE:360,CROW:210}[me.character])}draw()}
 function holdDirection(direction,on){if(on){heldDirections.add(direction);me.facing=direction==="left"?-1:1}else heldDirections.delete(direction)}
@@ -297,6 +321,6 @@ function drawAttackEffects(ctx){
  for(let i=damagePopups.length-1;i>=0;i--){const p=damagePopups[i];p.y-=1.1;p.life--;ctx.save();ctx.globalAlpha=Math.min(1,p.life/18);ctx.fillStyle=p.color;ctx.font="bold 25px system-ui";ctx.textAlign="center";ctx.strokeStyle="#101326";ctx.lineWidth=4;ctx.strokeText(p.text,p.x,p.y);ctx.fillText(p.text,p.x,p.y);ctx.restore();if(p.life<=0)damagePopups.splice(i,1);}
  if(me.poisonUntil>performance.now()){ctx.fillStyle="#a8ef62";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.fillText("POISON",me.x*960,435-me.y*360-165);}
 }
-function loop(t){if(gameActive){if(quickHeld&&t>=nextQuickAt)act("quick");const movingLeft=heldDirections.has("left"),movingRight=heldDirections.has("right");if(movingLeft!==movingRight){const dir=movingLeft?-1:1;me.x=Math.max(.06,Math.min(.94,me.x+dir*.008));me.facing=dir;if(me.y===0&&me.action!=="attack")me.action="walk"}else if(me.y===0&&me.action==="walk")me.action="idle";if(me.knockback>0){me.x=Math.max(.05,Math.min(.95,me.x+me.knockbackDir*me.knockback));me.knockback*=.86;if(me.knockback<.001)me.knockback=0}if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.poisonUntil>t&&t>=me.nextPoisonAt){me.health=Math.max(0,me.health-3);me.nextPoisonAt=t+850;damagePopups.push({x:me.x*960,y:435-me.y*360-135,text:"-3 POISON",color:"#a8ef62",life:50});socket.emit("game:health",{health:me.health,message:"クロウの毒ダメージ！"});updateHealth();if(me.health<=0){gameActive=false;$("gameStatus").textContent="毒でKO！ 対戦終了です。"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character,attackType:me.attackType,attackSeq:me.attackSeq});lastSend=t}draw()}requestAnimationFrame(loop)}
+function loop(t){if(gameActive){if(quickHeld&&t>=nextQuickAt)act("quick");const movingLeft=heldDirections.has("left"),movingRight=heldDirections.has("right");if(movingLeft!==movingRight){const dir=movingLeft?-1:1;me.x=Math.max(.06,Math.min(.94,me.x+dir*.008));me.facing=dir;if(me.y===0&&me.action!=="attack")me.action="walk"}else if(me.y===0&&me.action==="walk")me.action="idle";if(me.knockback>0){me.x=Math.max(.05,Math.min(.95,me.x+me.knockbackDir*me.knockback));me.knockback*=.86;if(me.knockback<.001)me.knockback=0}if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.poisonUntil>t&&t>=me.nextPoisonAt){me.health=Math.max(0,me.health-3);me.nextPoisonAt=t+850;damagePopups.push({x:me.x*960,y:435-me.y*360-135,text:"-3 POISON",color:"#a8ef62",life:50});socket.emit("game:health",{health:me.health,message:"クロウの毒ダメージ！"});updateHealth();if(me.health<=0){gameActive=false;$("gameStatus").textContent="毒でKO！"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character,attackType:me.attackType,attackSeq:me.attackSeq});lastSend=t}draw()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 </script></body></html>
