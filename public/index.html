@@ -100,8 +100,8 @@ socket.on("room:opponent-left",()=>{$("gameStatus").textContent="対戦相手が
 socket.on("room:error",d=>status(d.message));
 socket.on("game:ready",()=>{enterGame();});
 socket.on("game:opponent-state",s=>{opponent.x=1-s.x;opponent.y=s.y;opponent.facing=-s.facing;opponent.action=s.action;opponent.character=s.character;opponent.attackType=s.attackType||"quick";if(s.attackSeq!==opponent.attackSeq){opponent.attackSeq=s.attackSeq;spawnAttackEffect(opponent.x*960,435-opponent.y*360,opponent.facing,opponent.attackType,opponent.character)}$("opName").textContent=s.character;});
-socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();socket.emit("game:health",{health:me.health,message:"相手に命中！"});if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！";}});
-socket.on("game:health",data=>{opponent.health=data.health;updateHealth();$("gameStatus").textContent=data.message||"相手にダメージ！";if(opponent.health<=0){$("gameStatus").textContent="相手をKO！ 勝敗を確認中…";}});
+socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！";}});
+socket.on("game:health",data=>{if(data.playerId===socket.id){me.health=data.health;}else{opponent.health=data.health;}updateHealth();$("gameStatus").textContent=data.message||"ダメージ！";});
 socket.on("game:hit-confirm",data=>{$("gameStatus").textContent=data.message||"命中！";});
 socket.on("game:attack-miss",data=>{$("gameStatus").textContent=data.message||"攻撃が届かなかった！ もう少し近づこう。";});
 $("matchButton").onclick=()=>socket.emit("matchmaking:join");
@@ -166,122 +166,52 @@ window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(["arrowleft",
 window.addEventListener("keyup",e=>{let k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")holdDirection("left",false);if(k==="d"||k==="arrowright")holdDirection("right",false);if(k==="f"||k==="enter")quickHeld=false});
 window.addEventListener("blur",()=>heldDirections.clear());
 function pixel(ctx,x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
-function fighterPixel(ctx,x,y,face,color,action,label,character){
- const now=performance.now()/1000;
- const moving=action==="walk",jumping=action==="jump"||y<430,attacking=action==="attack";
- const run=Math.sin(now*13),idle=Math.sin(now*3)*1.5;
- const bob=jumping?-5: moving?Math.abs(run)*2:idle;
- const legSwing=moving?run*8:jumping?-7:0;
- const armSwing=moving?-run*6:0;
- ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(face,1);
- // shadow
- ctx.globalAlpha=jumping?.12:.3;
- ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(0,5,jumping?18:34,jumping?5:8,0,0,Math.PI*2);ctx.fill();
- ctx.globalAlpha=1;
- // palette and pixel-outline helper
- const dark="#11172d",ink="#090e20",gold="#ffd45d",white="#fff4d1";
- const p=(a,b,w,h,c)=>pixel(ctx,a,b,w,h,c);
- // legs: layered boots with animated stride
- p(-22+legSwing,-31+bob,17,25,dark);p(7-legSwing,-31+bob,17,25,dark);
- p(-25+legSwing,-13+bob,22,11,character==="CROW"?"#dcecff":"#f2c45b");
- p(5-legSwing,-13+bob,22,11,character==="CROW"?"#dcecff":"#f2c45b");
- p(-23+legSwing,-15+bob,17,4,"#fff0a0");p(7-legSwing,-15+bob,17,4,"#fff0a0");
- // body silhouette and armor layers
- p(-31,-83+bob,62,57,ink);p(-27,-81+bob,54,51,dark);
- p(-24,-78+bob,48,42,color);p(-20,-74+bob,40,31,"#ffffff20");
- p(-29,-48+bob,58,12,dark);p(-24,-47+bob,48,7,gold);
- p(-10,-43+bob,20,8,ink);
- // character-specific torso and head
- if(character==="SURGE"){
-   p(-30,-119+bob,60,39,"#1b2c54");p(-25,-116+bob,50,32,"#38cce8");
-   p(-22,-112+bob,44,21,"#20345c");p(-17,-108+bob,12,10,"#f4fbff");p(5,-108+bob,12,10,"#f4fbff");
-   p(-13,-105+bob,6,6,"#14213c");p(9,-105+bob,6,6,"#14213c");
-   p(-8,-91+bob,16,5,"#f3a84b");p(-34,-103+bob,8,22,gold);p(26,-103+bob,8,22,gold);
-   p(-23,-82+bob,46,7,"#18345d");p(-17,-75+bob,34,6,"#8df4ff");
-   p(-33,-76+bob,12,28,"#20b9df");p(21,-76+bob,12,28,"#20b9df");
-   p(-25,-68+bob,9,8,"#a4f7ff");p(16,-68+bob,9,8,"#a4f7ff");
- }else if(character==="SHELLY"){
-   p(-28,-120+bob,56,37,"#e8b28f");p(-31,-124+bob,62,17,"#63328d");
-   p(-32,-116+bob,14,28,"#7d43a6");p(18,-116+bob,14,28,"#7d43a6");
-   p(-24,-121+bob,13,8,"#b878cf");p(12,-121+bob,13,8,"#b878cf");
-   p(-17,-109+bob,11,8,"#fff1dc");p(7,-109+bob,11,8,"#fff1dc");
-   p(-14,-107+bob,6,6,"#30233c");p(8,-107+bob,6,6,"#30233c");
-   p(-8,-96+bob,17,5,"#a64d62");p(-25,-88+bob,50,9,"#f6d7ed");
-   p(-20,-79+bob,40,8,"#63328d");p(-8,-72+bob,16,6,"#e7b5ec");
-   p(23,-81+bob,16,25,"#5a3986");p(34,-86+bob,10,35,"#cbd5e8");p(37,-91+bob,7,8,gold);
- }else if(character==="SPIKE"){
-   p(-27,-118+bob,54,37,"#579d4d");p(-23,-125+bob,12,13,"#9ce56b");p(11,-125+bob,12,13,"#9ce56b");
-   p(-34,-112+bob,12,16,"#8bd95d");p(22,-112+bob,12,16,"#8bd95d");
-   p(-18,-109+bob,11,10,"#fff0c5");p(7,-109+bob,11,10,"#fff0c5");
-   p(-15,-107+bob,6,7,"#202b35");p(9,-107+bob,6,7,"#202b35");
-   p(-6,-97+bob,13,5,"#284832");p(-23,-88+bob,46,10,"#315d3d");
-   p(-28,-81+bob,12,25,"#74cb5c");p(16,-81+bob,12,25,"#74cb5c");
-   p(-34,-72+bob,8,11,"#b5ed72");p(26,-72+bob,8,11,"#b5ed72");
-   p(-20,-68+bob,40,7,"#315d3d");
- }else{
-   p(-29,-120+bob,58,38,"#26364f");p(-33,-116+bob,66,19,"#101c32");
-   p(-23,-112+bob,46,15,"#d9efff");p(-18,-109+bob,13,9,"#fff");
-   p(6,-109+bob,13,9,"#fff");p(-14,-107+bob,7,7,"#152238");p(8,-107+bob,7,7,"#152238");
-   p(-9,-96+bob,19,5,"#111a2c");p(-25,-88+bob,50,9,"#16263f");
-   p(-30,-80+bob,14,28,"#b7e3ff");p(16,-80+bob,14,28,"#b7e3ff");
-   p(-35,-73+bob,8,13,"#e8f8ff");p(27,-73+bob,8,13,"#e8f8ff");
-   p(-22,-68+bob,44,7,"#17263d");p(-17,-63+bob,34,5,"#8bb9db");
- }
- // unmistakable Brawl Stars-inspired character signatures
- if(character==="SURGE"){
-   // Surge's oversized visor helmet, yellow side fins and chest reactor
-   p(-35,-126+bob,70,8,"#16284d");p(-39,-116+bob,9,22,gold);p(30,-116+bob,9,22,gold);
-   p(-15,-111+bob,30,5,"#b9fbff");p(-9,-52+bob,18,12,"#ffe36e");p(-5,-49+bob,10,6,"#36d8f2");
- }else if(character==="SHELLY"){
-   // Shelly's purple hair, headband and recognizable shotgun
-   p(-31,-126+bob,62,9,"#4b2676");p(-34,-118+bob,12,23,"#713a9d");p(22,-118+bob,12,23,"#713a9d");
-   p(-22,-124+bob,44,6,"#f0b4df");p(-10,-92+bob,20,5,"#8c435d");
-   p(27,-73+bob,27,12,"#6c7189");p(48,-76+bob,8,18,"#cbd3e7");p(55,-72+bob,6,8,"#f4d36d");
- }else if(character==="SPIKE"){
-   // Spike's round cactus head and visible green spikes
-   p(-36,-113+bob,8,13,"#a9ee72");p(28,-113+bob,8,13,"#a9ee72");
-   p(-20,-130+bob,9,10,"#a9ee72");p(-4,-133+bob,9,12,"#b8f47b");p(13,-130+bob,9,10,"#a9ee72");
-   p(-7,-91+bob,14,8,"#315d3d");p(-30,-63+bob,7,8,"#b8f47b");p(23,-63+bob,7,8,"#b8f47b");
- }else if(character==="CROW"){
-   // Crow's dark bird hood, sharp beak and feather crest
-   p(-30,-127+bob,60,10,"#101b32");p(-22,-135+bob,13,12,"#263c5b");p(-5,-139+bob,13,15,"#263c5b");p(12,-133+bob,12,11,"#263c5b");
-   ctx.fillStyle="#e8c75b";ctx.beginPath();ctx.moveTo(14,-105+bob);ctx.lineTo(34,-100+bob);ctx.lineTo(14,-94+bob);ctx.closePath();ctx.fill();
-   p(-24,-88+bob,48,7,"#182b46");p(-27,-65+bob,8,12,"#d9efff");p(19,-65+bob,8,12,"#d9efff");
- }
- // shoulders and animated arms
- if(attacking){
-   p(20,-83+bob,17,20,dark);p(29,-81+bob,28,13,color);
-   p(50,-86+bob,17,22,gold);p(59,-91+bob,9,8,white);
-   p(70,-91+bob,7,7,"#9ff5ff");p(76,-82+bob,5,5,"#fff");
- }else{
-   p(-39,-82+bob,17,25,dark);p(22,-82+bob,17,25,dark);
-   p(-38,-78+bob+armSwing,14,25,color);p(24,-78+bob-armSwing,14,25,color);
-   p(-40,-57+bob+armSwing,18,13,gold);p(22,-57+bob-armSwing,18,13,gold);
-   p(-39,-58+bob+armSwing,10,4,white);p(29,-58+bob-armSwing,9,4,white);
- }
- // bright pixel highlights and outline accents
- p(-25,-80+bob,7,4,"#ffffff88");p(18,-80+bob,6,4,"#ffffff66");
- p(-29,-36+bob,58,4,"#ffffff33");
- ctx.restore();
- ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";
- ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-143);ctx.shadowBlur=0;
-}
-const fighterModels={};
-const fighterModelUrls={SURGE:"https://cdn.brawlify.com/brawlers/model/16000038.png",SHELLY:"https://cdn.brawlify.com/brawlers/model/16000000.png",SPIKE:"https://cdn.brawlify.com/brawlers/model/16000005.png",CROW:"https://cdn.brawlify.com/brawlers/model/16000012.png"};
-for(const [name,url] of Object.entries(fighterModelUrls)){const img=new Image();img.src=url;fighterModels[name]=img;}
 function fighter(ctx,x,y,face,color,action,label,character){
- const img=fighterModels[character];
- if(!img||!img.complete||!img.naturalWidth){fighterPixel(ctx,x,y,face,color,action,label,character);return;}
  const now=performance.now()/1000;
- const bob=action==="jump"||y<430?-5:action==="walk"?Math.abs(Math.sin(now*13))*2:Math.sin(now*3)*1.5;
- const scale=action==="attack"?1.06:1;
+ const bob=action==="jump"||y<430?-4:action==="walk"?Math.abs(Math.sin(now*13))*2:Math.sin(now*3)*1.2;
+ const cell=6;
+ const sprites={
+ SURGE:[
+ "......KKKKKK......","....KKBBBBBBKK....","...KBBYYYYYYBBK...","..KBBYOOOOOOYBBK..","..KBBCCCCCCCCBBK..",".KBBCCKKKKKKCCBBK.",".KBBCKWWKKWWKCCBBK",".KBBCKWWKKWWKCCBBK.",".KBBCCKKKKKKCCBBK..","..KBBCCCCCCCCBBK..","...KBBCCYYCCBBK...","...KBBBBBBBBBBK...","..KKBBCCCCCCBBKK..","..KBBCCBBBBCCBBK..","..KBBCCBYYBCCBBK..","..KBBCCBBBBCCBBK..","...KBBBBBBBBBBK...","...KKBBBBBBBBKK...","..KBBKK....KKBBK..","..KBBK......KBBK..","..KKK........KKK..","....KK......KK....","....YY......YY...."
+ ],
+ SHELLY:[
+ ".....KKKKKKKK.....","...KKPPPPPPPPKK...","..KPPPPPPPPPPPPK..",".KPPPPPPPPPPPPPPK.",".KPPPPPPPPPPPPPPK.",".KPPPPSSSSSSPPPPK.",".KPPPSWWSSWWSPPPK.",".KPPPSWWSSWWSPPPK.",".KPPPSSSSSSSSPPPK.","..KPPPPSSSSPPPPK..","...KTTTTTTTTTTK...","...KTTTTTTTTTTK...","..KKPPPPPPPPPPKK..","..KPPPPPPPPPPPPK..","..KPPPPPPPPPPPPK..","..KPPPPPPPPPPPPK..","...KPPPPPPPPPPK...","...KKPPPPPPPPKK...","..KPPKK....KKPPK..","..KPPK......KPPK..","..KKK........KKK..","....KK......KK....","....GG......GG...."
+ ],
+ SPIKE:[
+ "......KKKKKK......","....KKGGGGGGKK....","...KGGGGGGGGGGK...","..KGGGGGGGGGGGGK..",".KGGGGGGGGGGGGGGK.",".KGGGGGGGGGGGGGGK.",".KGGGWWGGGGWWGGGK.",".KGGGWWGGGGWWGGGK.",".KGGGGGGGGGGGGGGK.","..KGGGGGGGGGGGGK..","...KGGGGGGGGGGK...","....KGGGGGGGGK....","...KKGGGGGGGGKK...","..KGGGGGGGGGGGGK..","..KGGGGGGGGGGGGK..","...KGGGGGGGGGGK...","....KGGGGGGGGK....","....KKGGGGGGKK....","...KGGKK....KKGGK..","...KGGK......KGGK..","....KK........KK....","...KK..........KK...","..KK............KK.."
+ ],
+ CROW:[
+ "......KKKKKK......","....KKDDDDDDKK....","...KDDDDDDDDDDK...","..KDDDDDDDDDDDDK..",".KDDDDDDDDDDDDDDK.",".KDDDDDDDDDDDDDDK.",".KDDWWDDDDWWDDDDK.",".KDDWWDDDDWWDDDDK.",".KDDDDDDDDDDDDDDK.","..KDDDDDDDDDDDDK..","...KDDDDDDDDDDK...","....KDDDDDDDDK....","...KKDDDDDDDDKK...","..KDDDDDDDDDDDDK..","..KDDDDDDDDDDDDK..","...KDDDDDDDDDDK...","....KDDDDDDDDK....","....KKDDDDDDKK....","...KDDKK....KKDDK..","...KDDK......KDDK..","....KK........KK....","...KK..........KK...","..KK............KK.."
+ ]};
+ const palette={K:"#101426",B:"#123c78",C:"#25c8e8",Y:"#ffd34e",O:"#ed7040",W:"#fff2cf",P:"#713d9c",S:"#e8b28f",T:"#552d83",G:"#62b94e",D:"#243a5b"};
+ const rows=sprites[character]||sprites.SURGE;
+ const width=Math.max(...rows.map(r=>r.length));
  ctx.save();
- ctx.globalAlpha=.28;ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(x,y+3,action==="jump"||y<430?20:34,6,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
- ctx.translate(Math.round(x),Math.round(y+bob));ctx.scale(face*scale,scale);
- ctx.shadowColor=color;ctx.shadowBlur=action==="attack"?18:7;
- ctx.drawImage(img,-82,-194,164,194);
+ ctx.globalAlpha=.3;ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(x,y+4,action==="jump"||y<430?19:32,6,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+ ctx.translate(Math.round(x),Math.round(y+bob));ctx.scale(face,1);
+ for(let ry=0;ry<rows.length;ry++){
+  for(let rx=0;rx<rows[ry].length;rx++){
+   const key=rows[ry][rx];if(key==="."||!palette[key])continue;
+   pixel(ctx,(rx-width/2)*cell,(ry-rows.length)*cell,cell,cell,palette[key]);
+  }
+ }
+ if(character==="SURGE"){
+  pixel(ctx,-17,-91,34,5,"#fff4d1");pixel(ctx,-12,-87,8,5,"#18213a");pixel(ctx,5,-87,8,5,"#18213a");
+  pixel(ctx,-6,-47,12,12,"#ffe36e");pixel(ctx,-3,-44,6,6,"#ff7b42");
+  pixel(ctx,20,-69,19,9,"#263b65");pixel(ctx,35,-71,8,13,"#ffe36e");
+ }else if(character==="SHELLY"){
+  pixel(ctx,-25,-111,50,7,"#f2c0a0");pixel(ctx,-20,-105,40,5,"#34223c");
+  pixel(ctx,24,-62,27,10,"#5d647a");pixel(ctx,46,-65,7,16,"#c8d2e8");
+ }else if(character==="SPIKE"){
+  for(const [sx,sy] of [[-39,-111],[-34,-132],[-8,-143],[20,-137],[37,-115]])pixel(ctx,sx,sy,8,8,"#c4f27a");
+  pixel(ctx,-15,-92,30,5,"#2e5d38");
+ }else if(character==="CROW"){
+  pixel(ctx,16,-105,24,9,"#e8bd45");pixel(ctx,34,-102,10,5,"#f5d66a");
+  pixel(ctx,-15,-88,30,5,"#111b30");pixel(ctx,-24,-140,10,13,"#405a7b");
+ }
+ pixel(ctx,-22,-77,6,6,"#ffffff55");pixel(ctx,16,-77,6,6,"#ffffff44");
  ctx.restore();
- ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-205+bob);ctx.shadowBlur=0;
+ ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-151+bob);ctx.shadowBlur=0;
 }
 function spawnAttackEffect(x,y,facing,type,character){
  const palette={SURGE:"#45eaff",SHELLY:"#ffb5e8",SPIKE:"#a8f56b",CROW:"#d8efff"};
