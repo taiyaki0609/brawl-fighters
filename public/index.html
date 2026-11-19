@@ -25,6 +25,17 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;margin:12px 0}
 .controls button{min-width:62px;touch-action:none}
 .note{color:#b9b9d8;font-size:.85rem;line-height:1.6;text-align:center}
+#selectScreen{padding:18px 10px 22px;text-align:center}
+#selectScreen h2{font-size:1.6rem;color:#ffe36e;margin:8px 0}
+.select-sub{color:#c9c7eb;margin:0 0 18px}
+.character-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.character-card{margin:0;min-width:0;min-height:180px;padding:12px 8px;background:linear-gradient(160deg,#303866,#171b38);border:3px solid #555b91;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;transition:transform .15s,border-color .15s,background .15s}
+.character-card.selected{border-color:#ffe36e;background:linear-gradient(160deg,#62532d,#282344);box-shadow:0 0 0 3px #ffe36e44,0 8px 24px #0006;transform:translateY(-3px)}
+.char-portrait{width:82px;height:82px;border-radius:22px;display:grid;place-items:center;font-size:2.7rem;font-weight:1000;color:#10152b;border:4px solid #ffffff88;box-shadow:inset 0 -8px #0002,0 5px 12px #0006}
+.character-card strong{font-size:1.05rem}.character-card small{color:#d1d1eb;font-size:.75rem}
+#selectedDescription{min-height:26px;color:#fff1ad;margin:8px}
+#startBattleButton{width:min(100%,360px);font-size:1.15rem;padding:14px}
+@media(max-width:560px){.character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.character-card{min-height:155px}}
 @media(max-width:560px){body{padding:8px}.panel{padding:14px}.controls button{flex:1}.topbar{justify-content:center}}
 </style></head>
 <body><main>
@@ -39,10 +50,21 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 </section>
 <section id="game" class="panel">
 <div class="topbar"><strong style="color:#ffe36e">BRAWL FIGHTERS</strong><span id="playerInfo">PLAYER 1</span><button id="backButton" class="secondary">ロビーへ戻る</button></div>
-<h2 style="text-align:center">BRAWL ARENA</h2>
+<section id="selectScreen">
+<h2>キャラクターを選ぼう！</h2>
+<p class="select-sub">好きなファイターを選択して、対戦を始めよう。</p>
+<div class="character-grid">
+<button class="character-card selected" data-character="SURGE" aria-pressed="true"><span class="char-portrait" style="background:linear-gradient(145deg,#9af5ff,#159bc9)">⚡</span><strong>サージ</strong><small>パワーアップ型</small></button>
+<button class="character-card" data-character="SHELLY" aria-pressed="false"><span class="char-portrait" style="background:linear-gradient(145deg,#ffc1e9,#9254c8)">💥</span><strong>シェリー</strong><small>ショットガン型</small></button>
+<button class="character-card" data-character="SPIKE" aria-pressed="false"><span class="char-portrait" style="background:linear-gradient(145deg,#c6ff91,#429c56)">🌵</span><strong>スパイク</strong><small>トゲ攻撃型</small></button>
+<button class="character-card" data-character="CROW" aria-pressed="false"><span class="char-portrait" style="background:linear-gradient(145deg,#e4f7ff,#668bb4)">🪶</span><strong>クロウ</strong><small>素早い羽攻撃型</small></button>
+</div>
+<div id="selectedDescription">サージ：エネルギー弾で攻めるパワフルなファイター！</div>
+<button id="startBattleButton">このキャラクターで対戦開始！</button>
+</section>
+<h2 id="arenaTitle" style="text-align:center;display:none">BRAWL ARENA</h2>
 <div class="hud"><div><div class="playerlabel"><span>YOU</span><span id="youName">SURGE</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span>OPPONENT</span><span id="opName">SURGE</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
 <canvas id="arena" width="960" height="540" aria-label="対戦ステージ"></canvas>
-<div class="controls"><label>キャラクター <select id="character"><option value="SURGE">サージ</option><option value="SHELLY">シェリー</option><option value="SPIKE">スパイク</option><option value="CROW">クロウ</option></select></label></div>
 <div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">2段ジャンプ</button></div>
 <div class="controls attack-controls"><button id="quickAttack">通常攻撃 [F]</button><button id="strongAttack" class="secondary">強攻撃 [G]</button><button id="specialAttack" style="background:#ff8b4a">必殺技 [H]</button></div>
 <p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space で2段ジャンプ、F＝通常攻撃・G＝強攻撃・H＝必殺技。スマホ・タブレットは攻撃ボタンを使用できます。</p>
@@ -60,7 +82,7 @@ const colors={SURGE:"#42d9f5",SHELLY:"#bd79ff",SPIKE:"#72e36d",CROW:"#c4e7ff"};
 function status(t){$("status").textContent=t}
 function showRoom(c){roomCode=c;$("roomCode").textContent=c;$("roomInfo").style.display="block"}
 function resetLobby(){ $("roomInfo").style.display="none";$("cancelButton").disabled=true;$("matchButton").disabled=false}
-function enterGame(){gameActive=true;$("lobby").style.display="none";$("game").style.display="block";$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="対戦開始！相手と操作を同期しています。";draw()}
+function enterGame(){gameActive=false;$("lobby").style.display="none";$("game").style.display="block";$("selectScreen").style.display="block";$("arenaTitle").style.display="none";document.querySelector(".hud").style.display="none";$("arena").style.display="none";document.querySelectorAll(".controls").forEach(e=>e.style.display="none");$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="キャラクターを選択してください。";draw()}
 function leaveGame(){gameActive=false;socket.emit("room:leave");$("game").style.display="none";$("lobby").style.display="block";resetLobby();status("ロビーに戻りました。")}
 socket.on("connect",()=>status("サーバーに接続しました！対戦方法を選んでください。"));
 socket.on("connect_error",()=>status("サーバーに接続できません。再読み込みしてください。"));
@@ -81,7 +103,18 @@ $("joinButton").onclick=()=>{let c=$("roomInput").value.trim().toUpperCase();if(
 $("leaveButton").onclick=()=>{socket.emit("room:leave");resetLobby();status("ルームを退出しました。")};
 $("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[^A-Za-z2-9]/g,"").toUpperCase().slice(0,5)};
 $("backButton").onclick=leaveGame;
-$("character").onchange=()=>{me.character=$("character").value;$("youName").textContent=me.character};
+const characterDescriptions={SURGE:"サージ：エネルギー弾で攻めるパワフルなファイター！",SHELLY:"シェリー：ショットガンの連射で広く攻撃！",SPIKE:"スパイク：トゲを飛ばして相手をけん制！",CROW:"クロウ：羽を3方向に飛ばすスピード型！"};
+document.querySelectorAll(".character-card").forEach(card=>card.addEventListener("click",()=>{
+ me.character=card.dataset.character;
+ document.querySelectorAll(".character-card").forEach(other=>{const chosen=other===card;other.classList.toggle("selected",chosen);other.setAttribute("aria-pressed",String(chosen))});
+ $("selectedDescription").textContent=characterDescriptions[me.character];
+}));
+$("startBattleButton").onclick=()=>{
+ gameActive=true;$("selectScreen").style.display="none";$("arenaTitle").style.display="block";
+ document.querySelector(".hud").style.display="grid";$("arena").style.display="block";
+ document.querySelectorAll("#game .controls").forEach(e=>e.style.display="flex");
+ $("youName").textContent=me.character;$("gameStatus").textContent="対戦開始！ "+me.character+" で戦おう！";draw();
+};
 const heldDirections=new Set();
 function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(["quick","strong","special"].includes(a)){const now=performance.now();if(a==="strong"&&now<(me.strongReady||0))return;if(a==="special"&&now<(me.specialReady||0))return;if(a==="strong")me.strongReady=now+650;if(a==="special")me.specialReady=now+1100;me.action="attack";me.attackType=a;me.attackSeq++;me.attackUntil=now+(a==="quick"?210:a==="strong"?430:560);spawnAttackEffect(me.x*960,435-me.y*360,me.facing,a,me.character);if(a==="quick")nextQuickAt=now+240}draw()}
 function holdDirection(direction,on){if(on){heldDirections.add(direction);me.facing=direction==="left"?-1:1}else heldDirections.delete(direction)}
