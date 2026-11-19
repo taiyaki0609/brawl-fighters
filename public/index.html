@@ -1,125 +1,90 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BRAWL FIGHTERS</title>
-  <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; color: #f7f7ff; background: radial-gradient(circle at 50% 0%, #343078, #111326 58%, #090b16); }
-    main { width: min(100%, 560px); padding: 30px; border: 2px solid #7774d8; border-radius: 22px; background: #171a35ee; box-shadow: 0 18px 60px #0008; }
-    h1 { margin: 0; text-align: center; letter-spacing: .08em; font-size: clamp(2rem, 8vw, 3.2rem); color: #ffe36e; text-shadow: 3px 3px #9b4e32; }
-    .subtitle { text-align: center; color: #b9b9df; margin: 6px 0 26px; }
-    h2 { font-size: 1.05rem; margin: 22px 0 10px; color: #aeadff; }
-    button, input { width: 100%; min-height: 48px; border-radius: 12px; font: inherit; }
-    button { border: 0; margin: 6px 0; padding: 12px 16px; font-weight: 800; cursor: pointer; color: #17152b; background: #ffe36e; }
-    button.secondary { color: #fff; background: #5553a6; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    input { padding: 12px; border: 2px solid #5553a6; outline: none; color: white; background: #0d1025; text-align: center; text-transform: uppercase; letter-spacing: .18em; }
-    .join-row { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
-    .join-row button { margin: 0; }
-    #status { margin-top: 20px; padding: 14px; min-height: 54px; border-radius: 12px; text-align: center; color: #d7d6ff; background: #0d1025; }
-    #roomInfo { display: none; margin-top: 14px; padding: 18px; text-align: center; border: 1px dashed #ffe36e; border-radius: 14px; }
-    #roomCode { display: block; font-size: 2rem; font-weight: 900; letter-spacing: .2em; color: #ffe36e; margin: 8px; }
-    .small { color: #aaaed0; font-size: .86rem; line-height: 1.6; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>BRAWL FIGHTERS</h1>
-    <p class="subtitle">PIXEL-ART ONLINE BATTLE</p>
-
-    <h2>⚔️ ランダムマッチ</h2>
-    <button id="matchButton">対戦相手を探す</button>
-    <button id="cancelButton" class="secondary" disabled>マッチングをキャンセル</button>
-
-    <h2>🚪 ルーム対戦</h2>
-    <button id="createButton" class="secondary">ルームを作成する</button>
-    <div class="join-row">
-      <input id="roomInput" maxlength="5" placeholder="ルーム番号" aria-label="ルーム番号">
-      <button id="joinButton">参加</button>
-    </div>
-
-    <div id="roomInfo">
-      <div>あなたのルーム番号</div>
-      <strong id="roomCode">-----</strong>
-      <p class="small">この番号を対戦相手に共有してください。</p>
-      <button id="leaveButton" class="secondary">ルームを退出</button>
-    </div>
-
-    <div id="status" role="status" aria-live="polite">サーバーに接続しています...</div>
-    <p class="small">オンラインロビー試作版です。対戦画面・キャラクター操作は次の開発段階で追加します。</p>
-  </main>
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    const statusBox = document.getElementById("status");
-    const matchButton = document.getElementById("matchButton");
-    const cancelButton = document.getElementById("cancelButton");
-    const createButton = document.getElementById("createButton");
-    const joinButton = document.getElementById("joinButton");
-    const roomInput = document.getElementById("roomInput");
-    const roomInfo = document.getElementById("roomInfo");
-    const roomCode = document.getElementById("roomCode");
-
-    function status(message) { statusBox.textContent = message; }
-    function showRoom(code) {
-      roomCode.textContent = code;
-      roomInfo.style.display = "block";
-    }
-    function resetRoom() {
-      roomInfo.style.display = "none";
-      cancelButton.disabled = true;
-      matchButton.disabled = false;
-    }
-
-    socket.on("connect", () => status("サーバーに接続しました！対戦方法を選んでください。"));
-    socket.on("connect_error", () => status("サーバーに接続できません。少し待って再読み込みしてください。"));
-    socket.on("server:ready", () => {});
-    socket.on("matchmaking:searching", () => {
-      status("対戦相手を探しています...");
-      cancelButton.disabled = false;
-      matchButton.disabled = true;
-    });
-    socket.on("matchmaking:cancelled", () => {
-      status("マッチングをキャンセルしました。");
-      resetRoom();
-    });
-    socket.on("matchmaking:found", ({ roomCode: code }) => {
-      status("対戦相手が見つかりました！");
-      showRoom(code);
-      cancelButton.disabled = true;
-    });
-    socket.on("room:created", ({ roomCode: code }) => {
-      status("ルームを作成しました。相手の参加を待っています。");
-      showRoom(code);
-    });
-    socket.on("room:joined", ({ roomCode: code, playerNumber }) => {
-      showRoom(code);
-      status("ルームに参加しました！（プレイヤー " + playerNumber + "）");
-    });
-    socket.on("room:waiting", () => status("相手が退出しました。もう一人の参加を待っています。"));
-    socket.on("room:opponent-left", () => status("対戦相手が退出しました。"));
-    socket.on("room:error", ({ message }) => status(message));
-    socket.on("game:ready", () => status("2人そろいました！対戦画面は次の段階で接続します。"));
-
-    matchButton.addEventListener("click", () => socket.emit("matchmaking:join"));
-    cancelButton.addEventListener("click", () => socket.emit("matchmaking:cancel"));
-    createButton.addEventListener("click", () => socket.emit("room:create"));
-    joinButton.addEventListener("click", () => {
-      const code = roomInput.value.trim().toUpperCase();
-      if (code.length !== 5) return status("5文字のルーム番号を入力してください。");
-      socket.emit("room:join", code);
-    });
-    document.getElementById("leaveButton").addEventListener("click", () => {
-      socket.emit("room:leave");
-      resetRoom();
-      status("ルームを退出しました。");
-    });
-    roomInput.addEventListener("input", () => {
-      roomInput.value = roomInput.value.replace(/[^A-Za-z2-9]/g, "").toUpperCase().slice(0, 5);
-    });
-  </script>
-</body>
-</html>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAWL FIGHTERS</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:#fff;background:radial-gradient(circle at 50% 0%,#393477,#111326 65%,#090b16);padding:20px}
+main{width:min(100%,900px);margin:0 auto}.panel{padding:24px;border:2px solid #7774d8;border-radius:20px;background:#171a35ee;box-shadow:0 16px 50px #0007}
+h1{text-align:center;color:#ffe36e;font-size:clamp(2rem,7vw,3.5rem);margin:4px;text-shadow:3px 3px #9b4e32;letter-spacing:.08em}
+.sub{text-align:center;color:#c3c2e8;margin:4px 0 24px}h2{color:#b9b7ff;font-size:1.1rem}
+button,input,select{font:inherit;border-radius:11px;min-height:46px;padding:10px 14px}
+button{border:0;background:#ffe36e;color:#17152b;font-weight:800;cursor:pointer;margin:5px}
+button.secondary{background:#5553a6;color:white}button:disabled{opacity:.5}
+input,select{background:#0d1025;color:white;border:2px solid #5553a6}
+.wide{width:100%}.join{display:grid;grid-template-columns:1fr 110px;gap:8px}.join button{margin:0}
+#status{padding:14px;margin-top:18px;text-align:center;background:#0d1025;border-radius:12px;color:#ddd}
+#roomInfo{display:none;text-align:center;margin:14px;padding:12px;border:1px dashed #ffe36e;border-radius:12px}
+#roomCode{font-size:2rem;color:#ffe36e;letter-spacing:.2em}
+#game{display:none}.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+#arena{display:block;width:100%;aspect-ratio:16/9;background:#161b3b;border:4px solid #7774d8;border-radius:14px;image-rendering:pixelated}
+.hud{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.hpwrap{height:15px;background:#333;border:2px solid #aaa;border-radius:8px;overflow:hidden}.hp{height:100%;width:100%;background:#62e58b}
+.playerlabel{display:flex;justify-content:space-between;font-weight:800;font-size:.9rem;margin-bottom:4px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;margin:12px 0}
+.controls button{min-width:62px;touch-action:none}
+.note{color:#b9b9d8;font-size:.85rem;line-height:1.6;text-align:center}
+@media(max-width:560px){body{padding:8px}.panel{padding:14px}.controls button{flex:1}.topbar{justify-content:center}}
+</style></head>
+<body><main>
+<section id="lobby" class="panel">
+<h1>BRAWL FIGHTERS</h1><p class="sub">PIXEL-ART ONLINE BATTLE</p>
+<h2>⚔️ ランダムマッチ</h2><button id="matchButton" class="wide">対戦相手を探す</button><button id="cancelButton" class="wide secondary" disabled>マッチングをキャンセル</button>
+<h2>🚪 ルーム対戦</h2><button id="createButton" class="wide secondary">ルームを作成する</button>
+<div class="join"><input id="roomInput" maxlength="5" placeholder="ルーム番号" aria-label="ルーム番号"><button id="joinButton">参加</button></div>
+<div id="roomInfo">あなたのルーム番号<strong id="roomCode">-----</strong><button id="leaveButton" class="secondary">ルームを退出</button></div>
+<div id="status" role="status" aria-live="polite">サーバーに接続しています...</div>
+<p class="note">2人で遊べるオンライン対戦ゲーム。対戦画面は開発中です。</p>
+</section>
+<section id="game" class="panel">
+<div class="topbar"><strong style="color:#ffe36e">BRAWL FIGHTERS</strong><span id="playerInfo">PLAYER 1</span><button id="backButton" class="secondary">ロビーへ戻る</button></div>
+<h2 style="text-align:center">BRAWL ARENA</h2>
+<div class="hud"><div><div class="playerlabel"><span>YOU</span><span id="youName">SURGE</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span>OPPONENT</span><span id="opName">SURGE</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
+<canvas id="arena" width="960" height="540" aria-label="対戦ステージ"></canvas>
+<div class="controls"><label>キャラクター <select id="character"><option value="SURGE">サージ</option><option value="SHELLY">シェリー</option><option value="SPIKE">スパイク</option><option value="CROW">クロウ</option></select></label></div>
+<div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">ジャンプ</button><button id="attack">攻撃！</button></div>
+<p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space でジャンプ、F / Enter で攻撃。スマホ・タブレットはボタンを使用できます。</p>
+<div id="gameStatus" class="note">対戦相手と接続中...</div>
+</section></main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io();const $=id=>document.getElementById(id);
+let roomCode=null,playerNumber=1,gameActive=false,lastSend=0;
+const me={x:.22,y:0,vy:0,facing:1,action:"idle",character:"SURGE",attackUntil:0};
+const opponent={x:.78,y:0,facing:-1,action:"idle",character:"SURGE"};
+const colors={SURGE:"#42d9f5",SHELLY:"#bd79ff",SPIKE:"#72e36d",CROW:"#c4e7ff"};
+function status(t){$("status").textContent=t}
+function showRoom(c){roomCode=c;$("roomCode").textContent=c;$("roomInfo").style.display="block"}
+function resetLobby(){ $("roomInfo").style.display="none";$("cancelButton").disabled=true;$("matchButton").disabled=false}
+function enterGame(){gameActive=true;$("lobby").style.display="none";$("game").style.display="block";$("playerInfo").textContent="PLAYER "+playerNumber;$("gameStatus").textContent="対戦開始！相手と操作を同期しています。";draw()}
+function leaveGame(){gameActive=false;socket.emit("room:leave");$("game").style.display="none";$("lobby").style.display="block";resetLobby();status("ロビーに戻りました。")}
+socket.on("connect",()=>status("サーバーに接続しました！対戦方法を選んでください。"));
+socket.on("connect_error",()=>status("サーバーに接続できません。再読み込みしてください。"));
+socket.on("matchmaking:searching",()=>{status("対戦相手を探しています...");$("cancelButton").disabled=false;$("matchButton").disabled=true});
+socket.on("matchmaking:cancelled",()=>{status("マッチングをキャンセルしました。");resetLobby()});
+socket.on("matchmaking:found",d=>{showRoom(d.roomCode);status("対戦相手が見つかりました！")});
+socket.on("room:created",d=>{showRoom(d.roomCode);status("ルームを作成しました。相手を待っています。")});
+socket.on("room:joined",d=>{playerNumber=d.playerNumber;showRoom(d.roomCode);status("ルームに参加しました！（プレイヤー "+playerNumber+"）")});
+socket.on("room:waiting",()=>{if(gameActive){$("gameStatus").textContent="相手が退出しました。";}else status("相手が退出しました。もう一人の参加を待っています。")});
+socket.on("room:opponent-left",()=>{$("gameStatus").textContent="対戦相手が退出しました。"});
+socket.on("room:error",d=>status(d.message));
+socket.on("game:ready",()=>{enterGame();});
+socket.on("game:opponent-state",s=>{opponent.x=s.x;opponent.y=s.y;opponent.facing=s.facing;opponent.action=s.action;opponent.character=s.character;$("opName").textContent=s.character;});
+$("matchButton").onclick=()=>socket.emit("matchmaking:join");
+$("cancelButton").onclick=()=>socket.emit("matchmaking:cancel");
+$("createButton").onclick=()=>socket.emit("room:create");
+$("joinButton").onclick=()=>{let c=$("roomInput").value.trim().toUpperCase();if(c.length!==5)return status("5文字のルーム番号を入力してください。");socket.emit("room:join",c)};
+$("leaveButton").onclick=()=>{socket.emit("room:leave");resetLobby();status("ルームを退出しました。")};
+$("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[^A-Za-z2-9]/g,"").toUpperCase().slice(0,5)};
+$("backButton").onclick=leaveGame;
+$("character").onchange=()=>{me.character=$("character").value;$("youName").textContent=me.character};
+function act(a){if(!gameActive)return;if(a==="left"){me.x=Math.max(.06,me.x-.035);me.facing=-1;me.action="walk"}if(a==="right"){me.x=Math.min(.94,me.x+.035);me.facing=1;me.action="walk"}if(a==="jump"&&me.y===0){me.vy=.19;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
+$("left").onpointerdown=e=>{e.preventDefault();act("left")};$("right").onpointerdown=e=>{e.preventDefault();act("right")};
+$("jump").onpointerdown=e=>{e.preventDefault();act("jump")};$("attack").onpointerdown=e=>{e.preventDefault();act("attack")};
+window.addEventListener("keydown",e=>{if(!gameActive||e.repeat)return;let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")act("left");if(k==="d"||k==="arrowright")act("right");if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("attack")});
+function fighter(ctx,x,y,face,color,action,label){ctx.save();ctx.translate(x,y);ctx.scale(face,1);ctx.fillStyle="#0008";ctx.fillRect(-27,2,54,8);ctx.fillStyle="#17152b";ctx.fillRect(-18,-55,36,53);ctx.fillStyle=color;ctx.fillRect(-19,-57,38,37);ctx.fillStyle="#fff";ctx.fillRect(2,-49,7,7);ctx.fillStyle="#17152b";ctx.fillRect(5,-47,3,3);ctx.fillStyle=color;ctx.fillRect(-14,-20,28,19);ctx.fillStyle="#ffe36e";ctx.fillRect(-13,-2,10,7);ctx.fillRect(5,-2,10,7);if(action==="attack"){ctx.fillStyle="#fff18b";ctx.fillRect(20,-44,30,10);ctx.fillRect(40,-52,8,26)}else{ctx.fillStyle="#ddd";ctx.fillRect(16,-35,17,8)}ctx.restore();ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.fillText(label,x,y-72)}
+function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action, "YOU");fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT");}
+function loop(t){if(gameActive){if(me.y>0||me.vy>0){me.y+=me.vy*.05;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>
