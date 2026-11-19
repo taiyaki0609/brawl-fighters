@@ -43,15 +43,15 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <div class="hud"><div><div class="playerlabel"><span>YOU</span><span id="youName">SURGE</span></div><div class="hpwrap"><div class="hp" id="youHp"></div></div></div><div><div class="playerlabel"><span>OPPONENT</span><span id="opName">SURGE</span></div><div class="hpwrap"><div class="hp" id="opHp"></div></div></div></div>
 <canvas id="arena" width="960" height="540" aria-label="対戦ステージ"></canvas>
 <div class="controls"><label>キャラクター <select id="character"><option value="SURGE">サージ</option><option value="SHELLY">シェリー</option><option value="SPIKE">スパイク</option><option value="CROW">クロウ</option></select></label></div>
-<div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">ジャンプ</button><button id="attack">攻撃！</button></div>
-<p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space でジャンプ、F / Enter で攻撃。スマホ・タブレットはボタンを使用できます。</p>
+<div class="controls"><button id="left">◀ 左</button><button id="right">右 ▶</button><button id="jump">2段ジャンプ</button><button id="attack">攻撃！</button></div>
+<p class="note">キーボード：A / D または ← / → で移動、W / ↑ / Space で2段ジャンプ、F / Enter で攻撃。スマホ・タブレットはボタンを使用できます。</p>
 <div id="gameStatus" class="note">対戦相手と接続中...</div>
 </section></main>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket=io();const $=id=>document.getElementById(id);
 let roomCode=null,playerNumber=1,gameActive=false,lastSend=0;
-const me={x:.22,y:0,vy:0,facing:1,action:"idle",character:"SURGE",attackUntil:0};
+const me={x:.22,y:0,vy:0,jumpCount:0,facing:1,action:"idle",character:"SURGE",attackUntil:0};
 const opponent={x:.78,y:0,facing:-1,action:"idle",character:"SURGE"};
 const colors={SURGE:"#42d9f5",SHELLY:"#bd79ff",SPIKE:"#72e36d",CROW:"#c4e7ff"};
 function status(t){$("status").textContent=t}
@@ -79,12 +79,56 @@ $("leaveButton").onclick=()=>{socket.emit("room:leave");resetLobby();status("ル
 $("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[^A-Za-z2-9]/g,"").toUpperCase().slice(0,5)};
 $("backButton").onclick=leaveGame;
 $("character").onchange=()=>{me.character=$("character").value;$("youName").textContent=me.character};
-function act(a){if(!gameActive)return;if(a==="left"){me.x=Math.max(.06,me.x-.035);me.facing=-1;me.action="walk"}if(a==="right"){me.x=Math.min(.94,me.x+.035);me.facing=1;me.action="walk"}if(a==="jump"&&me.y===0){me.vy=.19;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
+function act(a){if(!gameActive)return;if(a==="left"){me.x=Math.max(.06,me.x-.035);me.facing=-1;me.action="walk"}if(a==="right"){me.x=Math.min(.94,me.x+.035);me.facing=1;me.action="walk"}if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
 $("left").onpointerdown=e=>{e.preventDefault();act("left")};$("right").onpointerdown=e=>{e.preventDefault();act("right")};
 $("jump").onpointerdown=e=>{e.preventDefault();act("jump")};$("attack").onpointerdown=e=>{e.preventDefault();act("attack")};
 window.addEventListener("keydown",e=>{if(!gameActive||e.repeat)return;let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")act("left");if(k==="d"||k==="arrowright")act("right");if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("attack")});
-function fighter(ctx,x,y,face,color,action,label){ctx.save();ctx.translate(x,y);ctx.scale(face,1);ctx.fillStyle="#0008";ctx.fillRect(-27,2,54,8);ctx.fillStyle="#17152b";ctx.fillRect(-18,-55,36,53);ctx.fillStyle=color;ctx.fillRect(-19,-57,38,37);ctx.fillStyle="#fff";ctx.fillRect(2,-49,7,7);ctx.fillStyle="#17152b";ctx.fillRect(5,-47,3,3);ctx.fillStyle=color;ctx.fillRect(-14,-20,28,19);ctx.fillStyle="#ffe36e";ctx.fillRect(-13,-2,10,7);ctx.fillRect(5,-2,10,7);if(action==="attack"){ctx.fillStyle="#fff18b";ctx.fillRect(20,-44,30,10);ctx.fillRect(40,-52,8,26)}else{ctx.fillStyle="#ddd";ctx.fillRect(16,-35,17,8)}ctx.restore();ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.fillText(label,x,y-72)}
-function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action, "YOU");fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT");}
-function loop(t){if(gameActive){if(me.y>0||me.vy>0){me.y+=me.vy*.05;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
+function pixel(ctx,x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
+function fighter(ctx,x,y,face,color,action,label,character){
+ ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(face,1);
+ // grounded shadow and animated feet
+ ctx.globalAlpha=.28;pixel(ctx,-31,3,62,9,"#000");ctx.globalAlpha=1;
+ const bob=action==="jump"?-3:0;
+ // legs
+ pixel(ctx,-21,-19+bob,15,18,"#20243d");pixel(ctx,7,-19+bob,15,18,"#20243d");
+ pixel(ctx,-24,-5+bob,19,7,"#f4c95d");pixel(ctx,5,-5+bob,19,7,"#f4c95d");
+ // body silhouette, armor and side highlights
+ pixel(ctx,-27,-62+bob,54,47,"#171a32");pixel(ctx,-24,-60+bob,48,42,color);
+ pixel(ctx,-20,-56+bob,40,31,"#ffffff22");pixel(ctx,-27,-35+bob,54,9,"#171a32");
+ // character-specific head and details
+ if(character==="SURGE"){
+   pixel(ctx,-24,-91+bob,48,31,"#263b68");pixel(ctx,-19,-87+bob,38,22,"#48dff2");
+   pixel(ctx,-17,-83+bob,34,10,"#15233f");pixel(ctx,-11,-81+bob,8,6,"#fff");pixel(ctx,5,-81+bob,8,6,"#fff");
+   pixel(ctx,-28,-72+bob,8,13,"#ffcf52");pixel(ctx,20,-72+bob,8,13,"#ffcf52");
+   pixel(ctx,-17,-64+bob,34,6,"#f6a63b");pixel(ctx,-10,-48+bob,20,8,"#1d3157");
+   pixel(ctx,-33,-58+bob,10,25,"#42d9f5");pixel(ctx,23,-58+bob,10,25,"#42d9f5");
+ }else if(character==="SHELLY"){
+   pixel(ctx,-25,-91+bob,50,30,"#f0c49c");pixel(ctx,-28,-96+bob,56,15,"#713b9b");
+   pixel(ctx,-31,-87+bob,13,24,"#713b9b");pixel(ctx,18,-87+bob,13,24,"#713b9b");
+   pixel(ctx,-15,-80+bob,8,5,"#26223b");pixel(ctx,8,-80+bob,8,5,"#26223b");
+   pixel(ctx,-8,-69+bob,17,4,"#a94e68");pixel(ctx,-22,-57+bob,44,8,"#f6d4ee");
+   pixel(ctx,20,-48+bob,23,10,"#5a3b8d");pixel(ctx,35,-53+bob,8,22,"#d9d9e8");
+ }else if(character==="SPIKE"){
+   pixel(ctx,-23,-87+bob,46,29,"#62b957");pixel(ctx,-18,-94+bob,9,12,"#9be76d");
+   pixel(ctx,8,-96+bob,9,14,"#9be76d");pixel(ctx,-29,-82+bob,10,12,"#9be76d");
+   pixel(ctx,19,-82+bob,10,12,"#9be76d");pixel(ctx,-13,-76+bob,8,7,"#171a32");
+   pixel(ctx,7,-76+bob,8,7,"#171a32");pixel(ctx,-5,-65+bob,10,5,"#294a35");
+   pixel(ctx,-32,-52+bob,8,18,"#78d765");pixel(ctx,24,-52+bob,8,18,"#78d765");
+ }else{
+   pixel(ctx,-25,-91+bob,50,30,"#29364e");pixel(ctx,-29,-88+bob,58,15,"#152239");
+   pixel(ctx,-18,-82+bob,36,9,"#e7f5ff");pixel(ctx,-13,-81+bob,8,7,"#172238");
+   pixel(ctx,6,-81+bob,8,7,"#172238");pixel(ctx,-9,-68+bob,18,5,"#111a2c");
+   pixel(ctx,-31,-57+bob,12,23,"#c4e7ff");pixel(ctx,19,-57+bob,12,23,"#c4e7ff");
+   pixel(ctx,-23,-49+bob,46,7,"#172239");
+ }
+ // arms, gloves, and action pose
+ if(action==="attack"){pixel(ctx,18,-57+bob,27,13,color);pixel(ctx,39,-62+bob,20,23,"#fff18b");pixel(ctx,54,-69+bob,8,8,"#fff");}
+ else{pixel(ctx,-36,-57+bob,13,27,color);pixel(ctx,23,-57+bob,13,27,color);pixel(ctx,-38,-34+bob,16,10,"#f4c95d");pixel(ctx,22,-34+bob,16,10,"#f4c95d");}
+ // pixel highlights
+ pixel(ctx,-22,-59+bob,8,4,"#ffffff88");pixel(ctx,14,-59+bob,8,4,"#ffffff55");
+ ctx.restore();ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.fillText(label,x,y-108);
+}
+function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);ctx.fillStyle="#ffffff18";for(let i=0;i<18;i++){ctx.fillRect((i*137)%960,100+(i*53)%245,3,3)}let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action,"YOU",me.character);fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT",opponent.character);}
+function loop(t){if(gameActive){if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 </script></body></html>
