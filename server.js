@@ -144,7 +144,7 @@ io.on("connection", (socket) => {
     const opponentCharacter = room.selections.get(opponentId) || null;
     socket.emit("game:selection-status", { youReady: true, opponentReady: Boolean(opponentCharacter), opponentCharacter });
     if (opponentCharacter) {
-      io.to(opponentId).emit("game:selection-status", { youReady: true, opponentReady: true, opponentCharacter: character });
+      io.to(code).emit("game:selection-status", { youReady: true, opponentReady: true, bothReady: true });
       io.to(code).emit("game:start-countdown");
     } else {
       io.to(opponentId).emit("game:selection-status", { youReady: false, opponentReady: true, opponentCharacter: character });
@@ -177,7 +177,11 @@ io.on("connection", (socket) => {
     if (!room || room.players.length !== 2 || !attack || typeof attack !== "object") return;
     const victimId = room.players.find((id) => id !== socket.id);
     const victimState = room.states.get(victimId);
-    if (!victimState) return;
+    const attackerState = room.states.get(socket.id);
+    if (!victimState || !attackerState) {
+      socket.emit("game:attack-miss", { message: "相手の位置を確認中… 少し待ってから攻撃してね。" });
+      return;
+    }
 
     const allowedCharacters = ["SURGE", "SHELLY", "SPIKE", "CROW"];
     const character = allowedCharacters.includes(attack.character) ? attack.character : "SURGE";
@@ -191,9 +195,9 @@ io.on("connection", (socket) => {
     room.lastAttackSeq.set(socket.id, seq);
 
     const attackerNumber = room.players.indexOf(socket.id) + 1;
-    const ax = Math.max(0, Math.min(1, Number(attack.x) || 0));
-    const ay = Math.max(0, Math.min(1, Number(attack.y) || 0));
-    const facing = attack.facing === -1 ? -1 : 1;
+    const ax = attackerState.x;
+    const ay = attackerState.y;
+    const facing = attackerState.facing;
     const attackerX = attackerNumber === 2 ? 1 - ax : ax;
     const attackerFacing = attackerNumber === 2 ? -facing : facing;
     const victimX = victimState.globalX;
@@ -210,7 +214,10 @@ io.on("connection", (socket) => {
     };
     const range = ranges[character][type];
     const inDirection = radial || Math.sign(dx) === attackerFacing;
-    if (!inDirection || distance > range || dy > 145) return;
+    if (!inDirection || distance > range + 55 || dy > 190) {
+      socket.emit("game:attack-miss", { message: "攻撃が届かなかった！ 相手に近づいてみよう。" });
+      return;
+    }
 
     let damage = ({ SURGE: { quick: 13, strong: 24, special: 30 },
       SHELLY: { quick: 21, strong: 30, special: 38 },
