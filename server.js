@@ -126,6 +126,19 @@ io.on("connection", (socket) => {
     io.to(code).emit("game:ready", { roomCode: code, players: 2 });
   });
 
+  socket.on("game:state", (state) => {
+    const code = socket.data.roomCode;
+    if (!code || !rooms.has(code) || !state || typeof state !== "object") return;
+    const safeState = {
+      x: Math.max(0, Math.min(1, Number(state.x) || 0)),
+      y: Math.max(0, Math.min(1, Number(state.y) || 0)),
+      facing: state.facing === -1 ? -1 : 1,
+      action: ["idle", "walk", "jump", "attack"].includes(state.action) ? state.action : "idle",
+      character: ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(state.character) ? state.character : "SURGE"
+    };
+    socket.to(code).emit("game:opponent-state", safeState);
+  });
+
   socket.on("room:leave", () => leaveRoom(socket));
   socket.on("disconnect", () => {
     removeFromQueue(socket.id);
