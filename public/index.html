@@ -79,10 +79,17 @@ $("leaveButton").onclick=()=>{socket.emit("room:leave");resetLobby();status("ル
 $("roomInput").oninput=()=>{$("roomInput").value=$("roomInput").value.replace(/[^A-Za-z2-9]/g,"").toUpperCase().slice(0,5)};
 $("backButton").onclick=leaveGame;
 $("character").onchange=()=>{me.character=$("character").value;$("youName").textContent=me.character};
-function act(a){if(!gameActive)return;if(a==="left"){me.x=Math.max(.06,me.x-.035);me.facing=-1;me.action="walk"}if(a==="right"){me.x=Math.min(.94,me.x+.035);me.facing=1;me.action="walk"}if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
-$("left").onpointerdown=e=>{e.preventDefault();act("left")};$("right").onpointerdown=e=>{e.preventDefault();act("right")};
+const heldDirections=new Set();
+function act(a){if(!gameActive)return;if(a==="jump"&&me.jumpCount<2){me.vy=me.jumpCount===0?.30:.25;me.jumpCount++;me.action="jump"}if(a==="attack"){me.action="attack";me.attackUntil=performance.now()+260}draw()}
+function holdDirection(direction,on){if(on){heldDirections.add(direction);me.facing=direction==="left"?-1:1}else heldDirections.delete(direction)}
+$("left").onpointerdown=e=>{e.preventDefault();$("left").setPointerCapture?.(e.pointerId);holdDirection("left",true)};
+$("right").onpointerdown=e=>{e.preventDefault();$("right").setPointerCapture?.(e.pointerId);holdDirection("right",true)};
+for(const id of ["left","right"]){$(id).onpointerup=$(id).onpointercancel=$(id).onlostpointercapture=()=>holdDirection(id,false)}
+window.addEventListener("pointerup",()=>{heldDirections.clear()});
 $("jump").onpointerdown=e=>{e.preventDefault();act("jump")};$("attack").onpointerdown=e=>{e.preventDefault();act("attack")};
-window.addEventListener("keydown",e=>{if(!gameActive||e.repeat)return;let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")act("left");if(k==="d"||k==="arrowright")act("right");if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("attack")});
+window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")holdDirection("left",true);if(k==="d"||k==="arrowright")holdDirection("right",true);if(k==="w"||k==="arrowup"||k===" ")act("jump");if(k==="f"||k==="enter")act("attack")});
+window.addEventListener("keyup",e=>{let k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")holdDirection("left",false);if(k==="d"||k==="arrowright")holdDirection("right",false)});
+window.addEventListener("blur",()=>heldDirections.clear());
 function pixel(ctx,x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
 function fighter(ctx,x,y,face,color,action,label,character){
  const now=performance.now()/1000;
@@ -145,6 +152,27 @@ function fighter(ctx,x,y,face,color,action,label,character){
    p(-35,-73+bob,8,13,"#e8f8ff");p(27,-73+bob,8,13,"#e8f8ff");
    p(-22,-68+bob,44,7,"#17263d");p(-17,-63+bob,34,5,"#8bb9db");
  }
+ // unmistakable Brawl Stars-inspired character signatures
+ if(character==="SURGE"){
+   // Surge's oversized visor helmet, yellow side fins and chest reactor
+   p(-35,-126+bob,70,8,"#16284d");p(-39,-116+bob,9,22,gold);p(30,-116+bob,9,22,gold);
+   p(-15,-111+bob,30,5,"#b9fbff");p(-9,-52+bob,18,12,"#ffe36e");p(-5,-49+bob,10,6,"#36d8f2");
+ }else if(character==="SHELLY"){
+   // Shelly's purple hair, headband and recognizable shotgun
+   p(-31,-126+bob,62,9,"#4b2676");p(-34,-118+bob,12,23,"#713a9d");p(22,-118+bob,12,23,"#713a9d");
+   p(-22,-124+bob,44,6,"#f0b4df");p(-10,-92+bob,20,5,"#8c435d");
+   p(27,-73+bob,27,12,"#6c7189");p(48,-76+bob,8,18,"#cbd3e7");p(55,-72+bob,6,8,"#f4d36d");
+ }else if(character==="SPIKE"){
+   // Spike's round cactus head and visible green spikes
+   p(-36,-113+bob,8,13,"#a9ee72");p(28,-113+bob,8,13,"#a9ee72");
+   p(-20,-130+bob,9,10,"#a9ee72");p(-4,-133+bob,9,12,"#b8f47b");p(13,-130+bob,9,10,"#a9ee72");
+   p(-7,-91+bob,14,8,"#315d3d");p(-30,-63+bob,7,8,"#b8f47b");p(23,-63+bob,7,8,"#b8f47b");
+ }else if(character==="CROW"){
+   // Crow's dark bird hood, sharp beak and feather crest
+   p(-30,-127+bob,60,10,"#101b32");p(-22,-135+bob,13,12,"#263c5b");p(-5,-139+bob,13,15,"#263c5b");p(12,-133+bob,12,11,"#263c5b");
+   ctx.fillStyle="#e8c75b";ctx.beginPath();ctx.moveTo(14,-105+bob);ctx.lineTo(34,-100+bob);ctx.lineTo(14,-94+bob);ctx.closePath();ctx.fill();
+   p(-24,-88+bob,48,7,"#182b46");p(-27,-65+bob,8,12,"#d9efff");p(19,-65+bob,8,12,"#d9efff");
+ }
  // shoulders and animated arms
  if(attacking){
    p(20,-83+bob,17,20,dark);p(29,-81+bob,28,13,color);
@@ -164,6 +192,6 @@ function fighter(ctx,x,y,face,color,action,label,character){
  ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-143);ctx.shadowBlur=0;
 }
 function draw(){const c=$("arena"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);let g=ctx.createLinearGradient(0,0,0,540);g.addColorStop(0,"#25295b");g.addColorStop(1,"#11152e");ctx.fillStyle=g;ctx.fillRect(0,0,960,540);ctx.fillStyle="#343b70";for(let x=0;x<960;x+=48)ctx.fillRect(x,365,24,175);ctx.fillStyle="#6d5a9d";ctx.fillRect(0,435,960,105);ctx.fillStyle="#ffe36e";ctx.fillRect(0,435,960,6);ctx.fillStyle="#fff2";for(let x=40;x<960;x+=80)ctx.fillRect(x,455,35,4);ctx.fillStyle="#9b8be0";ctx.fillRect(110,305,140,18);ctx.fillRect(710,305,140,18);ctx.fillStyle="#ffe36e";ctx.font="bold 22px system-ui";ctx.textAlign="center";ctx.fillText("BRAWL ARENA",480,65);ctx.fillStyle="#ffffff18";for(let i=0;i<18;i++){ctx.fillRect((i*137)%960,100+(i*53)%245,3,3)}let px=me.x*960,py=435-me.y*360;let ox=opponent.x*960,oy=435-opponent.y*360;fighter(ctx,px,py,me.facing,colors[me.character],me.action,"YOU",me.character);fighter(ctx,ox,oy,opponent.facing,colors[opponent.character],opponent.action,"OPPONENT",opponent.character);}
-function loop(t){if(gameActive){if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
+function loop(t){if(gameActive){const movingLeft=heldDirections.has("left"),movingRight=heldDirections.has("right");if(movingLeft!==movingRight){const dir=movingLeft?-1:1;me.x=Math.max(.06,Math.min(.94,me.x+dir*.008));me.facing=dir;if(me.y===0&&me.action!=="attack")me.action="walk"}else if(me.y===0&&me.action==="walk")me.action="idle";if(me.y>0||me.vy>0){me.y+=me.vy*.12;me.vy-=.012;if(me.y<=0){me.y=0;me.vy=0;me.jumpCount=0;if(me.action==="jump")me.action="idle"}}if(me.action==="attack"&&t>me.attackUntil)me.action="idle";if(t-lastSend>33){socket.emit("game:state",{x:me.x,y:me.y,facing:me.facing,action:me.action,character:me.character});lastSend=t}draw()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 </script></body></html>
