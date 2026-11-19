@@ -85,7 +85,7 @@ io.on("connection", (socket) => {
     }
 
     const code = makeRoomCode();
-    const room = { players: [opponentId, socket.id], mode: "matchmaking", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), finished: false, selections: new Map(), finished: false };
+    const room = { players: [opponentId, socket.id], mode: "matchmaking", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), health: new Map([[opponentId,100],[socket.id,100]]), finished: false };
     rooms.set(code, room);
 
     const first = io.sockets.sockets.get(opponentId);
@@ -106,7 +106,7 @@ io.on("connection", (socket) => {
     removeFromQueue(socket.id);
 
     const code = makeRoomCode();
-    rooms.set(code, { players: [socket.id], mode: "private", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), finished: false });
+    rooms.set(code, { players: [socket.id], mode: "private", states: new Map(), lastAttacks: new Map(), lastAttackSeq: new Map(), selections: new Map(), health: new Map([[socket.id,100]]), finished: false });
     attachPlayerToRoom(socket, code, 1);
     socket.emit("room:created", { roomCode: code });
   });
@@ -138,6 +138,7 @@ io.on("connection", (socket) => {
     const character = data && ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(data.character) ? data.character : null;
     if (!character) return;
     if (!room.selections) room.selections = new Map();
+    if (!room.health) room.health = new Map(room.players.map(id => [id,100]));
     if (room.selections.has(socket.id)) return;
     room.selections.set(socket.id, character);
     const opponentId = room.players.find((id) => id !== socket.id);
@@ -174,7 +175,7 @@ io.on("connection", (socket) => {
   socket.on("game:attack", (attack) => {
     const code = socket.data.roomCode;
     const room = code && rooms.get(code);
-    if (!room || room.players.length !== 2 || !attack || typeof attack !== "object") return;
+    if (!room || room.players.length !== 2 || room.finished || !attack || typeof attack !== "object") return;
     const victimId = room.players.find((id) => id !== socket.id);
     const victimState = room.states.get(victimId);
     const attackerState = room.states.get(socket.id);
@@ -238,6 +239,15 @@ io.on("connection", (socket) => {
       lift: type === "strong" || type === "special" ? .22 : .13,
       poison
     });
+    if (!room.health) room.health = new Map(room.players.map(id => [id,100]));
+    const victimHealth = Math.max(0, (room.health.get(victimId) ?? 100) - damage);
+    room.health.set(victimId, victimHealth);
+    io.to(code).emit("game:health", { playerId: victimId, health: victimHealth, message: "攻撃命中！ -" + damage + " HP" });
+    if (victimHealth <= 0 && !room.finished) {
+      room.finished = true;
+      io.to(socket.id).emit("game:result", { won: true });
+      io.to(victimId).emit("game:result", { won: false });
+    }
     socket.emit("game:hit-confirm", {
       message: character === "CROW" ? "命中！毒を付与！" :
         character === "SHELLY" ? "命中！近距離ほど大ダメージ！" : "命中！ ダメージ " + damage
@@ -248,12 +258,19 @@ io.on("connection", (socket) => {
     const code = socket.data.roomCode;
     const room = code && rooms.get(code);
     if (!room || !data || room.finished) return;
+    if (!room.health) room.health = new Map(room.players.map(id => [id,100]));
     const health = Math.max(0, Math.min(100, Number(data.health) || 0));
-    socket.to(code).emit("game:health", { health, message: String(data.message || "ダメージ！").slice(0, 80) });
-    if (health <= 0 && !room.finished) {
+    room.health.set(socket.id, Math.min(room.health.get(socket.id) ?? 100, health));
+    const currentHealth = room.health.get(socket.id);
+    io.to(code).emit("game:health", {
+      playerId: socket.id,
+      health: currentHealth,
+      message: String(data.message || "追加ダメージ！").slice(0, 80)
+    });
+    if (currentHealth <= 0) {
       room.finished = true;
-      const winnerId = room.players.find((id) => id !== socket.id);
-      io.to(winnerId).emit("game:result", { won: true });
+      const winnerId = room.players.find(id => id !== socket.id);
+      if (winnerId) io.to(winnerId).emit("game:result", { won: true });
       io.to(socket.id).emit("game:result", { won: false });
     }
   });
