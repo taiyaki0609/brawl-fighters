@@ -134,7 +134,9 @@ io.on("connection", (socket) => {
       y: Math.max(0, Math.min(1, Number(state.y) || 0)),
       facing: state.facing === -1 ? -1 : 1,
       action: ["idle", "walk", "jump", "attack"].includes(state.action) ? state.action : "idle",
-      character: ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(state.character) ? state.character : "SURGE"
+      character: ["SURGE", "SHELLY", "SPIKE", "CROW"].includes(state.character) ? state.character : "SURGE",
+      attackType: ["quick", "strong", "special"].includes(state.attackType) ? state.attackType : "quick",
+      attackSeq: Math.max(0, Math.floor(Number(state.attackSeq) || 0))
     };
     socket.to(code).emit("game:opponent-state", safeState);
   });
