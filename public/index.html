@@ -98,8 +98,8 @@ socket.on("room:opponent-left",()=>{$("gameStatus").textContent="対戦相手が
 socket.on("room:error",d=>status(d.message));
 socket.on("game:ready",()=>{enterGame();});
 socket.on("game:opponent-state",s=>{opponent.x=s.x;opponent.y=s.y;opponent.facing=s.facing;opponent.action=s.action;opponent.character=s.character;opponent.attackType=s.attackType||"quick";if(s.attackSeq!==opponent.attackSeq){opponent.attackSeq=s.attackSeq;spawnAttackEffect(opponent.x*960,435-opponent.y*360,opponent.facing,opponent.attackType,opponent.character)}$("opName").textContent=s.character;});
-socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！ 対戦終了です。";}});
-socket.on("game:health",data=>{opponent.health=data.health;updateHealth();$("gameStatus").textContent=data.message||"相手にダメージ！";});
+socket.on("game:hit",hit=>{me.health=Math.max(0,me.health-hit.damage);me.knockbackDir=hit.knockbackDir*(playerNumber===2?-1:1);me.knockback=Math.max(me.knockback,hit.knockback);me.vy=Math.max(me.vy,hit.lift);me.jumpCount=Math.max(me.jumpCount,1);if(hit.poison){me.poisonUntil=performance.now()+hit.poison.duration;me.nextPoisonAt=performance.now()+hit.poison.interval;}damagePopups.push({x:me.x*960,y:435-me.y*360-120,text:"-"+hit.damage,color:"#ffdf72",life:55});$("gameStatus").textContent=hit.poison?"毒状態！追加ダメージを受けます。":"攻撃を受けた！";updateHealth();socket.emit("game:health",{health:me.health,message:"相手に命中！"});if(me.health<=0){gameActive=false;$("gameStatus").textContent="KO！ 対戦終了です。";}});
+socket.on("game:health",data=>{opponent.health=data.health;updateHealth();$("gameStatus").textContent=data.message||"相手にダメージ！";if(opponent.health<=0){gameActive=false;$("gameStatus").textContent="WIN！ 相手をKOしました！";}});
 socket.on("game:hit-confirm",data=>{$("gameStatus").textContent=data.message||"命中！";});
 $("matchButton").onclick=()=>socket.emit("matchmaking:join");
 $("cancelButton").onclick=()=>socket.emit("matchmaking:cancel");
@@ -115,6 +115,7 @@ document.querySelectorAll(".character-card").forEach(card=>card.addEventListener
  $("selectedDescription").textContent=characterDescriptions[me.character];
 }));
 $("startBattleButton").onclick=()=>{
+ me.health=100;opponent.health=100;me.knockback=0;me.poisonUntil=0;updateHealth();
  gameActive=true;$("selectScreen").style.display="none";$("arenaTitle").style.display="block";
  document.querySelector(".hud").style.display="grid";$("arena").style.display="block";
  document.querySelectorAll("#game .controls").forEach(e=>e.style.display="flex");
