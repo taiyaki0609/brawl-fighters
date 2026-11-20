@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" shape-rendering="crispEdges">
+<g stroke="#160b35" stroke-width="4" stroke-linejoin="miter">
+<!-- rear shoulder and left glove -->
+<path fill="#3420a0" d="M12 42h8V34h19v5h8v9h-5v13H30v-4H17v-6h-5z"/>
+<path fill="#5745df" d="M17 40h8v-5h12v7h6v10h-9v5H20v-7h-5z" stroke="none"/>
+<path fill="#ffc51b" d="M42 38h10v7h8v18H47v-5h-7z"/>
+<!-- helmet -->
+<path fill="#f4a900" d="M47 9h8V5h35v5h10v8h9v9h5v20h-8v8H95v-7H79v-7H60v7H47v-8h-7V23h7z"/>
+<path fill="#ffe51d" d="M55 10h31v5h10v7h8v9h-8v-4H80v-5H63v5H51V17h4z" stroke="none"/>
+<path fill="#ffca16" d="M44 27h11v-7h10v16H53v8H43z" stroke="none"/>
+<!-- visor -->
+<path fill="#21137c" d="M73 33h30v6h8v17h-8v8H77v-6h-8V42h4z"/>
+<path fill="#4b35d2" d="M82 39h23v7h-7v8H82z" stroke="none"/>
+<!-- face and teeth -->
+<path fill="#e9efff" d="M75 58h31v7h-5v13H83v-6h-8z"/>
+<path fill="#fff" d="M84 61h5v12h-5zm10 0h5v12h-5z" stroke="none"/>
+<!-- body -->
+<path fill="#e91d43" d="M45 48h13v-5h14v7h11v8h16v8h-7v9h-9v8H68v-5H49v-7H39V59h6z"/>
+<path fill="#ff5366" d="M52 50h10v7h10v7h-9v7H52v-8h-6v-7h6z" stroke="none"/>
+<path fill="#a90036" d="M46 72h22v7h15v5H64v-4H48z" stroke="none"/>
+<!-- chest light and badge -->
+<path fill="#18e5d0" d="M66 65h9v11h-9z" stroke="none"/>
+<path fill="#ffe02b" d="M67 78h8v6h-8z" stroke="none"/>
+<path fill="#dbe5ff" d="M83 70h11v10H83z" stroke="none"/>
+<!-- right gauntlet -->
+<path fill="#ffbf13" d="M94 62h9v5h8v15h-7v5H94v-7h-5V70h5z"/>
+<path fill="#4631c5" d="M105 66h11v6h6v13h-6v8h-13v-6h-5V76h7z"/>
+<path fill="#6858f0" d="M109 70h8v8h5v7h-8v5h-9v-9h-5v-6h9z" stroke="none"/>
+<!-- legs -->
+<path fill="#17104c" d="M48 81h18v9h-7v8H48v-5h-8v-7h8zM73 84h17v8h-5v9H72v-7h-7v-6h8z"/>
+<!-- left boot -->
+<path fill="#ef1748" d="M39 91h15v8h7v15h-6v6H25v-7h5v-13h9z"/>
+<path fill="#ffcd16" d="M39 91h10v8h-7v8h-7v-9h4z" stroke="none"/>
+<path fill="#92206e" d="M25 108h14v6h16v6H25z" stroke="none"/>
+<!-- right boot -->
+<path fill="#f21b49" d="M77 96h14v7h9v11h8v7H75v-6h-5v-9h7z"/>
+<path fill="#ffcc1b" d="M78 96h10v7h-8v7h-7v-8h5z" stroke="none"/>
+<path fill="#92206e" d="M88 112h20v9H78v-5h10z" stroke="none"/>
+<!-- pixel highlights -->
+<path fill="#fff27a" stroke="none" d="M58 12h17v4H58zM85 19h8v4h-8zM53 53h7v4h-7z"/>
+<path fill="#9288ff" stroke="none" d="M22 42h8v4h-8zM109 73h6v4h-6zM51 87h8v4h-8z"/>
+</g></svg>
