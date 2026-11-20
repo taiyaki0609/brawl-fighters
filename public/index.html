@@ -31,7 +31,7 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 .character-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
 .character-card{margin:0;min-width:0;min-height:180px;padding:12px 8px;background:linear-gradient(160deg,#303866,#171b38);border:3px solid #555b91;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;transition:transform .15s,border-color .15s,background .15s}
 .character-card.selected{border-color:#ffe36e;background:linear-gradient(160deg,#62532d,#282344);box-shadow:0 0 0 3px #ffe36e44,0 8px 24px #0006;transform:translateY(-3px)}
-.char-portrait{width:116px;height:132px;display:block;object-fit:contain;filter:drop-shadow(0 8px 8px #0008);transition:transform .18s}
+.char-portrait{width:116px;height:140px;display:block;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 8px 8px #0008);transition:transform .18s}
 .character-card.selected .char-portrait{transform:scale(1.08) translateY(-2px)}
 .character-card strong{font-size:1.05rem}.character-card small{color:#d1d1eb;font-size:.75rem}
 #selectedDescription{min-height:26px;color:#fff1ad;margin:8px}
@@ -56,10 +56,10 @@ input,select{background:#0d1025;color:white;border:2px solid #5553a6}
 <h2>キャラクターを選ぼう！</h2>
 <p class="select-sub">好きなファイターを選んで「選択を確定」。2人そろったら試合開始！</p>
 <div class="character-grid">
-<button class="character-card selected" data-character="SURGE" aria-pressed="true"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000038.png" alt="サージ" loading="eager"><strong>サージ</strong><small>パワーアップ型</small></button>
-<button class="character-card" data-character="SHELLY" aria-pressed="false"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000000.png" alt="シェリー" loading="eager"><strong>シェリー</strong><small>ショットガン型</small></button>
-<button class="character-card" data-character="SPIKE" aria-pressed="false"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000005.png" alt="スパイク" loading="eager"><strong>スパイク</strong><small>トゲ攻撃型</small></button>
-<button class="character-card" data-character="CROW" aria-pressed="false"><img class="char-portrait" src="https://cdn.brawlify.com/brawlers/model/16000012.png" alt="クロウ" loading="eager"><strong>クロウ</strong><small>素早い羽攻撃型</small></button>
+<button class="character-card selected" data-character="SURGE" aria-pressed="true"><canvas class="char-portrait" width="120" height="145" role="img" aria-label="サージのドット絵"></canvas><strong>サージ</strong><small>パワーアップ型</small></button>
+<button class="character-card" data-character="SHELLY" aria-pressed="false"><canvas class="char-portrait" width="120" height="145" role="img" aria-label="シェリーのドット絵"></canvas><strong>シェリー</strong><small>ショットガン型</small></button>
+<button class="character-card" data-character="SPIKE" aria-pressed="false"><canvas class="char-portrait" width="120" height="145" role="img" aria-label="スパイクのドット絵"></canvas><strong>スパイク</strong><small>トゲ攻撃型</small></button>
+<button class="character-card" data-character="CROW" aria-pressed="false"><canvas class="char-portrait" width="120" height="145" role="img" aria-label="クロウのドット絵"></canvas><strong>クロウ</strong><small>素早い羽攻撃型</small></button>
 </div>
 <div id="selectedDescription">サージ：エネルギー弾で攻めるパワフルなファイター！</div>
 <button id="startBattleButton">このキャラクターで決定！</button>
@@ -222,29 +222,19 @@ function fighterFallback(ctx,x,y,face,color,action,label,character){
  ctx.restore();
  ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-151+bob);ctx.shadowBlur=0;
 }
-const pixelModelSources={SURGE:"https://cdn.brawlify.com/brawlers/model/16000038.png",SHELLY:"https://cdn.brawlify.com/brawlers/model/16000000.png",SPIKE:"https://cdn.brawlify.com/brawlers/model/16000005.png",CROW:"https://cdn.brawlify.com/brawlers/model/16000012.png"};
-const pixelModelCanvases={};
-for(const [name,url] of Object.entries(pixelModelSources)){
- const img=new Image();img.onload=()=>{
-  const small=document.createElement("canvas");small.width=36;small.height=44;
-  const smallCtx=small.getContext("2d");smallCtx.imageSmoothingEnabled=true;
-  smallCtx.clearRect(0,0,36,44);smallCtx.drawImage(img,0,0,36,44);
-  pixelModelCanvases[name]=small;
- };img.src=url;
-}
 function fighter(ctx,x,y,face,color,action,label,character){
- const sprite=pixelModelCanvases[character];
- if(!sprite){fighterFallback(ctx,x,y,face,color,action,label,character);return;}
- const now=performance.now()/1000;
- const bob=action==="jump"||y<430?-4:action==="walk"?Math.abs(Math.sin(now*13))*2:Math.sin(now*3)*1.2;
- ctx.save();
- ctx.globalAlpha=.3;ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(x,y+4,action==="jump"||y<430?19:32,6,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
- ctx.translate(Math.round(x),Math.round(y+bob));ctx.scale(face,1);
- ctx.imageSmoothingEnabled=false;
- ctx.drawImage(sprite,-54,-132,108,132);
- ctx.restore();
- ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-151+bob);ctx.shadowBlur=0;
+ fighterFallback(ctx,x,y,face,color,action,label,character);
 }
+function drawCharacterPortraits(){
+ document.querySelectorAll(".character-card").forEach(card=>{
+  const canvas=card.querySelector(".char-portrait");
+  if(!canvas)return;
+  const ctx=canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  fighterFallback(ctx,canvas.width/2,138,1,colors[card.dataset.character],"idle","",card.dataset.character);
+ });
+}
+drawCharacterPortraits();
 function spawnAttackEffect(x,y,facing,type,character){
  const palette={SURGE:"#45eaff",SHELLY:"#ffb5e8",SPIKE:"#a8f56b",CROW:"#d8efff"};
  const color=palette[character]||"#ffffff";
