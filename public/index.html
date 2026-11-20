@@ -222,7 +222,24 @@ function fighterFallback(ctx,x,y,face,color,action,label,character){
  ctx.restore();
  ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-151+bob);ctx.shadowBlur=0;
 }
+const surgeSprite=new Image();
+surgeSprite.src="/surge-sprite.png";
+function drawSurgeSprite(ctx,x,y,face,width,height){
+ ctx.save();
+ ctx.translate(Math.round(x),Math.round(y));
+ ctx.scale(face,1);
+ ctx.imageSmoothingEnabled=false;
+ ctx.drawImage(surgeSprite,-width/2,-height,width,height);
+ ctx.restore();
+}
 function fighter(ctx,x,y,face,color,action,label,character){
+ if(character==="SURGE"&&surgeSprite.complete&&surgeSprite.naturalWidth){
+  const bob=action==="jump"||y<430?-4:action==="walk"?Math.abs(Math.sin(performance.now()/1000*13))*2:0;
+  ctx.save();ctx.globalAlpha=.3;ctx.fillStyle="#050817";ctx.beginPath();ctx.ellipse(x,y+4,action==="jump"||y<430?20:32,6,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  drawSurgeSprite(ctx,x,y+bob,face,132,111);
+  ctx.fillStyle="#fff";ctx.font="bold 17px system-ui";ctx.textAlign="center";ctx.shadowColor="#050817";ctx.shadowBlur=5;ctx.fillText(label,x,y-122+bob);ctx.shadowBlur=0;
+  return;
+ }
  fighterFallback(ctx,x,y,face,color,action,label,character);
 }
 function drawCharacterPortraits(){
@@ -231,9 +248,14 @@ function drawCharacterPortraits(){
   if(!canvas)return;
   const ctx=canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  fighterFallback(ctx,canvas.width/2,138,1,colors[card.dataset.character],"idle","",card.dataset.character);
+  if(card.dataset.character==="SURGE"&&surgeSprite.complete&&surgeSprite.naturalWidth){
+   drawSurgeSprite(ctx,canvas.width/2,132,1,116,98);
+  }else{
+   fighterFallback(ctx,canvas.width/2,138,1,colors[card.dataset.character],"idle","",card.dataset.character);
+  }
  });
 }
+surgeSprite.onload=()=>{drawCharacterPortraits();draw();};
 drawCharacterPortraits();
 function spawnAttackEffect(x,y,facing,type,character){
  const palette={SURGE:"#45eaff",SHELLY:"#ffb5e8",SPIKE:"#a8f56b",CROW:"#d8efff"};
